@@ -1,6 +1,6 @@
 # AudioFocus Agent Guidelines
 
-This document captures the product vision and technical constraints for the **AudioFocus** Android overlay service. Future automated contributions should align with the requirements below.
+This document captures the product vision and technical constraints for the **AudioFocus** Android overlay service. Future automated contributions should align with the requirements below. The package name is **com.polaralias.audiofocus**.
 
 ## Vision & Product Goals
 - Provide a distraction-reducing overlay while users watch video content in the official YouTube or YouTube Music apps.
