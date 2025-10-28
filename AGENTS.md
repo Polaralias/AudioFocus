@@ -35,7 +35,7 @@ Overlay policy matrix:
    - Build `MediaController` instances from notifications to read `PlaybackState` and `MediaMetadata`.
    - Heuristics:
      - YouTube video detection: treat any `STATE_PLAYING` session as video.
-     - YouTube Music video detection: check `METADATA_KEY_VIDEO_HEIGHT/VIDEO_WIDTH` or notification extras `android.mediaMetadata.PRESENTATION_DISPLAY_TYPE == 1`; fall back to audio-only if metadata absent.
+    - YouTube Music video detection: check `METADATA_KEY_VIDEO_HEIGHT/VIDEO_WIDTH` or notification extras `android.media.metadata.PRESENTATION_DISPLAY_TYPE == 1`; fall back to audio-only if metadata absent.
    - Cache session metadata briefly to avoid redundant work.
 4. **Overlay Manager**
    - Combine signals (foreground app + playback state + window mode) into deterministic overlay commands.
