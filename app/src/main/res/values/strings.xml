@@ -2,4 +2,11 @@
 <resources>
     <string name="app_name">AudioFocus</string>
     <string name="hello_placeholder">Welcome to AudioFocus</string>
+    <string name="overlay_notification_channel_name">Focus Overlay</string>
+    <string name="overlay_notification_channel_description">Shows an overlay to reduce visual distractions</string>
+    <string name="overlay_notification_title">AudioFocus overlay running</string>
+    <string name="overlay_notification_content_active">Overlay is hiding distracting visuals</string>
+    <string name="overlay_notification_content_paused">Overlay paused by user</string>
+    <string name="overlay_notification_action_pause">Pause overlay</string>
+    <string name="overlay_notification_action_resume">Resume overlay</string>
 </resources>
