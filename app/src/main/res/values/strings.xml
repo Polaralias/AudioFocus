@@ -10,4 +10,19 @@
     <string name="overlay_notification_action_pause">Pause overlay</string>
     <string name="overlay_notification_action_resume">Resume overlay</string>
     <string name="accessibility_service_description">Tracks YouTube playback windows to control the focus overlay.</string>
+    <string name="setup_title">Get AudioFocus ready</string>
+    <string name="setup_description">Grant the required permissions so AudioFocus can run automatically while you watch videos.</string>
+    <string name="permission_overlay_title">1. Allow overlay</string>
+    <string name="permission_accessibility_title">2. Enable accessibility service</string>
+    <string name="permission_notification_title">3. Allow notification access</string>
+    <string name="permission_action_grant">Open settings</string>
+    <string name="permission_action_manage">Manage</string>
+    <string name="permission_status_granted">Granted</string>
+    <string name="permission_status_pending">Not granted yet</string>
+    <string name="permission_status_blocked">Complete the previous step first</string>
+    <string name="manual_controls_title">Manual controls</string>
+    <string name="manual_toggle_label">Pause overlay manually</string>
+    <string name="manual_status_active">Overlay is active and will appear automatically.</string>
+    <string name="manual_status_paused">Overlay is paused. Toggle back on to resume.</string>
+    <string name="permission_settings_error">Unable to open system settings.</string>
 </resources>
