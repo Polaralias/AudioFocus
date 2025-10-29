@@ -4,7 +4,7 @@ import com.polaralias.audiofocus.state.PlaybackActivity
 import com.polaralias.audiofocus.state.PlaybackContentType
 import com.polaralias.audiofocus.state.PlaybackSnapshot
 import com.polaralias.audiofocus.state.SupportedApp
-import com.polaralias.audiofocus.state.WindowMode
+import com.polaralias.audiofocus.state.WindowState
 import com.polaralias.audiofocus.state.WindowSnapshot
 
 sealed class OverlayCommand {
@@ -41,26 +41,26 @@ class OverlayManager {
         }
 
         return when (activeWindow.app) {
-            SupportedApp.YOUTUBE -> evaluateYouTube(activeWindow.mode)
-            SupportedApp.YOUTUBE_MUSIC -> evaluateYouTubeMusic(activeWindow.mode)
+            SupportedApp.YOUTUBE -> evaluateYouTube(activeWindow.state)
+            SupportedApp.YOUTUBE_MUSIC -> evaluateYouTubeMusic(activeWindow.state)
         }
     }
 
-    private fun evaluateYouTube(mode: WindowMode): OverlayCommand {
-        return when (mode) {
-            WindowMode.FULLSCREEN,
-            WindowMode.MINIMIZED,
-            WindowMode.PICTURE_IN_PICTURE -> OverlayCommand.Show(OverlayMode.FULL)
-            WindowMode.UNKNOWN -> OverlayCommand.Hide
+    private fun evaluateYouTube(state: WindowState): OverlayCommand {
+        return when (state) {
+            WindowState.FULLSCREEN,
+            WindowState.MINIMIZED,
+            WindowState.PICTURE_IN_PICTURE -> OverlayCommand.Show(OverlayMode.FULL)
+            WindowState.UNKNOWN -> OverlayCommand.Hide
         }
     }
 
-    private fun evaluateYouTubeMusic(mode: WindowMode): OverlayCommand {
-        return when (mode) {
-            WindowMode.FULLSCREEN -> OverlayCommand.Show(OverlayMode.FULL)
-            WindowMode.MINIMIZED,
-            WindowMode.PICTURE_IN_PICTURE -> OverlayCommand.Show(OverlayMode.PARTIAL)
-            WindowMode.UNKNOWN -> OverlayCommand.Hide
+    private fun evaluateYouTubeMusic(state: WindowState): OverlayCommand {
+        return when (state) {
+            WindowState.FULLSCREEN -> OverlayCommand.Show(OverlayMode.FULL)
+            WindowState.MINIMIZED,
+            WindowState.PICTURE_IN_PICTURE -> OverlayCommand.Show(OverlayMode.PARTIAL)
+            WindowState.UNKNOWN -> OverlayCommand.Hide
         }
     }
 }

@@ -9,4 +9,5 @@
     <string name="overlay_notification_content_paused">Overlay paused by user</string>
     <string name="overlay_notification_action_pause">Pause overlay</string>
     <string name="overlay_notification_action_resume">Resume overlay</string>
+    <string name="accessibility_service_description">Tracks YouTube playback windows to control the focus overlay.</string>
 </resources>
