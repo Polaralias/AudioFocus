@@ -95,7 +95,7 @@ class AudioFocusAccessibilityService : AccessibilityService() {
         val metrics = resources.displayMetrics
         val screenArea = (metrics.widthPixels * metrics.heightPixels).takeIf { it > 0 } ?: return false
         val windowArea = bounds.width().coerceAtLeast(0) * bounds.height().coerceAtLeast(0)
-        if (screenArea == 0) return false
+        if (windowArea <= 0) return false
         val coverage = windowArea.toFloat() / screenArea.toFloat()
         return coverage < PIP_COVERAGE_THRESHOLD
     }
@@ -112,6 +112,10 @@ class AudioFocusAccessibilityService : AccessibilityService() {
         val heightRatio = bounds.height().coerceAtLeast(0).toFloat() / screenHeight.toFloat()
         val coverage = widthRatio * heightRatio
 
+        if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
+            return WindowState.UNKNOWN
+        }
+
         return if (coverage >= FULLSCREEN_COVERAGE_THRESHOLD) {
             WindowState.FULLSCREEN
         } else {
@@ -123,5 +127,6 @@ class AudioFocusAccessibilityService : AccessibilityService() {
         private const val WINDOW_DEBOUNCE_MS = 250L
         private const val FULLSCREEN_COVERAGE_THRESHOLD = 0.75f
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
+        private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
     }
 }

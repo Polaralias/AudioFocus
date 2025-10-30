@@ -28,6 +28,7 @@ class FocusStateRepository(
     val overlayCommands: StateFlow<OverlayCommand> = _overlayCommands.asStateFlow()
 
     val manualPauseFlow: StateFlow<Boolean> = manualPause.asStateFlow()
+    val playbackSnapshots: StateFlow<PlaybackSnapshot?> = playbackState.asStateFlow()
 
     init {
         combine(windowState, playbackState, manualPause) { window, playback, pause ->

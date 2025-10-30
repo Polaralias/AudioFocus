@@ -27,10 +27,13 @@ class AudioFocusNotificationListener : NotificationListenerService() {
     private val latestSnapshots = mutableMapOf<SupportedApp, PlaybackSnapshot>()
     private val contentTypeCache = ExpiringValueCache<String, PlaybackContentType>(CONTENT_TYPE_CACHE_TTL_MS)
     private var lastPublished: PlaybackSnapshot? = null
+    @Volatile
+    private var activeApp: SupportedApp? = null
 
     override fun onCreate() {
         super.onCreate()
         repository = (application as AudioFocusApp).focusStateRepository
+        instance = this
     }
 
     override fun onDestroy() {
@@ -41,6 +44,8 @@ class AudioFocusNotificationListener : NotificationListenerService() {
         latestSnapshots.clear()
         contentTypeCache.clear()
         repository.updatePlaybackState(null)
+        activeApp = null
+        instance = null
         super.onDestroy()
     }
 
@@ -102,6 +107,7 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             lastPublished = snapshot
             repository.updatePlaybackState(snapshot)
         }
+        activeApp = snapshot?.app
     }
 
     private fun selectSnapshot(): PlaybackSnapshot? {
@@ -204,6 +210,53 @@ class AudioFocusNotificationListener : NotificationListenerService() {
         dispatchCurrentSnapshot()
     }
 
+    private fun performOnActiveController(action: (MediaController) -> Unit) {
+        val app = activeApp ?: return
+        val entry = mediaControllers[app] ?: return
+        callbackHandler.post {
+            action(entry.controller)
+        }
+    }
+
+    private fun togglePlayPauseInternal() {
+        performOnActiveController { controller ->
+            val state = controller.playbackState
+            val transport = controller.transportControls
+            val isPlaying = state?.state == PlaybackState.STATE_PLAYING ||
+                state?.state == PlaybackState.STATE_BUFFERING ||
+                state?.state == PlaybackState.STATE_FAST_FORWARDING ||
+                state?.state == PlaybackState.STATE_REWINDING
+            if (isPlaying) {
+                transport.pause()
+            } else {
+                transport.play()
+            }
+        }
+    }
+
+    private fun seekByInternal(offsetMs: Long) {
+        if (offsetMs == 0L) return
+        performOnActiveController { controller ->
+            val state = controller.playbackState ?: return@performOnActiveController
+            val transport = controller.transportControls
+            val currentPosition = state.position
+            val duration = controller.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)
+            val target = (currentPosition + offsetMs).coerceAtLeast(0L).let { position ->
+                if (duration != null && duration > 0) {
+                    position.coerceAtMost(duration)
+                } else {
+                    position
+                }
+            }
+            transport.seekTo(target)
+        }
+    }
+
+    private fun hasActiveControllerInternal(): Boolean {
+        val app = activeApp ?: return false
+        return mediaControllers[app]?.controller != null
+    }
+
     private inner class ControllerCallback(
         private val app: SupportedApp,
         private val controller: MediaController,
@@ -234,5 +287,20 @@ class AudioFocusNotificationListener : NotificationListenerService() {
         private const val METADATA_KEY_PRESENTATION_DISPLAY_TYPE = "android.media.metadata.PRESENTATION_DISPLAY_TYPE"
         private const val PRESENTATION_DISPLAY_TYPE_VIDEO = 1L
         private const val DEFAULT_YTM_CACHE_KEY = "youtube_music_default"
+
+        @Volatile
+        private var instance: AudioFocusNotificationListener? = null
+
+        fun togglePlayPause() {
+            instance?.togglePlayPauseInternal()
+        }
+
+        fun seekBy(offsetMs: Long) {
+            instance?.seekByInternal(offsetMs)
+        }
+
+        fun hasActiveController(): Boolean {
+            return instance?.hasActiveControllerInternal() ?: false
+        }
     }
 }

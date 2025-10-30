@@ -2,4 +2,39 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/overlay_scrim" />
+    android:background="@drawable/overlay_scrim">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="@dimen/overlay_controls_padding"
+        android:background="@drawable/overlay_controls_background">
+
+        <Button
+            android:id="@+id/overlay_seek_backward"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/overlay_controls_spacing"
+            android:text="@string/overlay_control_rewind" />
+
+        <Button
+            android:id="@+id/overlay_play_pause"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/overlay_controls_spacing"
+            android:text="@string/overlay_control_play" />
+
+        <Button
+            android:id="@+id/overlay_seek_forward"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_control_forward" />
+    </LinearLayout>
+
+</FrameLayout>
