@@ -18,7 +18,11 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.polaralias.audiofocus.AudioFocusApp
 import com.polaralias.audiofocus.R
+import com.polaralias.audiofocus.notifications.AudioFocusNotificationListener
 import com.polaralias.audiofocus.state.FocusStateRepository
+import com.polaralias.audiofocus.state.PlaybackActivity
+import com.polaralias.audiofocus.state.PlaybackContentType
+import com.polaralias.audiofocus.state.PlaybackSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +45,7 @@ class OverlayService : Service() {
     private var currentMode: OverlayMode? = null
 
     private var pendingAnimator: ViewPropertyAnimator? = null
+    private var controlsBinding: PlaybackControlsBinding? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -77,6 +82,11 @@ class OverlayService : Service() {
                 notificationManager.notify(NOTIFICATION_ID, notification)
             }
         }
+        serviceScope.launch {
+            repository.playbackSnapshots.collect { snapshot ->
+                controlsBinding?.update(snapshot)
+            }
+        }
     }
 
     private fun applyOverlayCommand(command: OverlayCommand) {
@@ -100,6 +110,7 @@ class OverlayService : Service() {
             OverlayMode.PARTIAL -> R.layout.overlay_partial
         }
         val view = LayoutInflater.from(this).inflate(layoutRes, null)
+        bindPlaybackControls(view, mode)
         val params = when (mode) {
             OverlayMode.FULL -> createFullOverlayLayoutParams()
             OverlayMode.PARTIAL -> createPartialOverlayLayoutParams()
@@ -125,6 +136,7 @@ class OverlayService : Service() {
         pendingAnimator = null
         overlayView = null
         currentMode = null
+        controlsBinding = null
         runCatching {
             if (immediate) {
                 windowManager.removeViewImmediate(view)
@@ -152,7 +164,6 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
@@ -180,6 +191,65 @@ class OverlayService : Service() {
             onEnd()
         }
         pendingAnimator?.start()
+    }
+
+    private fun bindPlaybackControls(view: View, mode: OverlayMode) {
+        val playPause = view.findViewById<View>(R.id.overlay_play_pause)
+        val rewind = view.findViewById<View>(R.id.overlay_seek_backward)
+        val forward = view.findViewById<View>(R.id.overlay_seek_forward)
+
+        if (mode == OverlayMode.PARTIAL) {
+            view.isClickable = false
+            view.isFocusable = false
+            view.setOnTouchListener { _, _ -> false }
+        }
+
+        if (playPause == null) {
+            controlsBinding = null
+            return
+        }
+
+        val binding = PlaybackControlsBinding(playPause, rewind, forward)
+        controlsBinding = binding
+        binding.update(repository.playbackSnapshots.value)
+    }
+
+    private inner class PlaybackControlsBinding(
+        private val playPause: View,
+        private val rewind: View?,
+        private val forward: View?,
+    ) {
+        init {
+            playPause.setOnClickListener { AudioFocusNotificationListener.togglePlayPause() }
+            rewind?.setOnClickListener { AudioFocusNotificationListener.seekBy(-SEEK_INTERVAL_MS) }
+            forward?.setOnClickListener { AudioFocusNotificationListener.seekBy(SEEK_INTERVAL_MS) }
+        }
+
+        fun update(snapshot: PlaybackSnapshot?) {
+            val isVideo = snapshot?.contentType == PlaybackContentType.VIDEO
+            val hasController = AudioFocusNotificationListener.hasActiveController()
+            val enabled = isVideo && hasController
+
+            listOf(playPause, rewind, forward).forEach { view ->
+                view?.isEnabled = enabled
+            }
+
+            if (playPause is android.widget.TextView) {
+                val textRes = if (snapshot?.activity == PlaybackActivity.PLAYING) {
+                    R.string.overlay_control_pause
+                } else {
+                    R.string.overlay_control_play
+                }
+                playPause.setText(textRes)
+            }
+            playPause.contentDescription = this@OverlayService.getString(
+                if (snapshot?.activity == PlaybackActivity.PLAYING) {
+                    R.string.overlay_control_pause
+                } else {
+                    R.string.overlay_control_play
+                },
+            )
+        }
     }
 
     private fun startInForeground(paused: Boolean) {
@@ -245,5 +315,6 @@ class OverlayService : Service() {
         const val NOTIFICATION_CHANNEL_ID = "audiofocus_overlay"
         const val ACTION_TOGGLE_MANUAL_PAUSE = "com.polaralias.audiofocus.action.TOGGLE_MANUAL_PAUSE"
         const val FADE_DURATION_MS = 200L
+        const val SEEK_INTERVAL_MS = 10_000L
     }
 }

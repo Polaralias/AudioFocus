@@ -9,6 +9,10 @@
     <string name="overlay_notification_content_paused">Overlay paused by user</string>
     <string name="overlay_notification_action_pause">Pause overlay</string>
     <string name="overlay_notification_action_resume">Resume overlay</string>
+    <string name="overlay_control_rewind">Rewind 10s</string>
+    <string name="overlay_control_play">Play</string>
+    <string name="overlay_control_pause">Pause</string>
+    <string name="overlay_control_forward">Forward 10s</string>
     <string name="accessibility_service_description">Tracks YouTube playback windows to control the focus overlay.</string>
     <string name="setup_title">Get AudioFocus ready</string>
     <string name="setup_description">Grant the required permissions so AudioFocus can run automatically while you watch videos.</string>
