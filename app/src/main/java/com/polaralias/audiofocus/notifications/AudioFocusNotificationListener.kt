@@ -280,7 +280,7 @@ class AudioFocusNotificationListener : NotificationListenerService() {
         val callback: MediaController.Callback,
     )
 
-    private companion object {
+    companion object {
         private const val CONTENT_TYPE_CACHE_TTL_MS = 30_000L
         private const val METADATA_KEY_VIDEO_WIDTH = "android.media.metadata.VIDEO_WIDTH"
         private const val METADATA_KEY_VIDEO_HEIGHT = "android.media.metadata.VIDEO_HEIGHT"
