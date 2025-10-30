@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 class OverlayService : Service() {
@@ -73,7 +72,7 @@ class OverlayService : Service() {
             }
         }
         serviceScope.launch {
-            repository.manualPauseFlow.distinctUntilChanged().collect { paused ->
+            repository.manualPauseFlow.collect { paused ->
                 val notification = buildNotification(paused)
                 notificationManager.notify(NOTIFICATION_ID, notification)
             }
