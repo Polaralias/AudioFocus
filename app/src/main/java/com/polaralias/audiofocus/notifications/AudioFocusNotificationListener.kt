@@ -138,8 +138,7 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             PlaybackState.STATE_FAST_FORWARDING,
             PlaybackState.STATE_REWINDING -> PlaybackActivity.PLAYING
 
-            PlaybackState.STATE_PAUSED,
-            PlaybackState.STATE_STOPPING -> PlaybackActivity.PAUSED
+            PlaybackState.STATE_PAUSED -> PlaybackActivity.PAUSED
 
             PlaybackState.STATE_STOPPED,
             PlaybackState.STATE_NONE,
@@ -175,8 +174,8 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             ?: DEFAULT_YTM_CACHE_KEY
 
         val contentType = contentTypeCache.getOrPut(key) {
-            val width = metadata.getLong(MediaMetadata.METADATA_KEY_VIDEO_WIDTH)
-            val height = metadata.getLong(MediaMetadata.METADATA_KEY_VIDEO_HEIGHT)
+            val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
+            val height = metadata.getLong(METADATA_KEY_VIDEO_HEIGHT)
             val presentationType = metadata.getLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
 
             if ((width > 0 && height > 0) || presentationType == PRESENTATION_DISPLAY_TYPE_VIDEO) {
@@ -230,6 +229,8 @@ class AudioFocusNotificationListener : NotificationListenerService() {
 
     private companion object {
         private const val CONTENT_TYPE_CACHE_TTL_MS = 30_000L
+        private const val METADATA_KEY_VIDEO_WIDTH = "android.media.metadata.VIDEO_WIDTH"
+        private const val METADATA_KEY_VIDEO_HEIGHT = "android.media.metadata.VIDEO_HEIGHT"
         private const val METADATA_KEY_PRESENTATION_DISPLAY_TYPE = "android.media.metadata.PRESENTATION_DISPLAY_TYPE"
         private const val PRESENTATION_DISPLAY_TYPE_VIDEO = 1L
         private const val DEFAULT_YTM_CACHE_KEY = "youtube_music_default"
