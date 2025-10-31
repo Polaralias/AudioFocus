@@ -24,4 +24,15 @@
     <string name="control_rewind">Rewind 10 seconds</string>
     <string name="control_play">Toggle play or pause</string>
     <string name="control_forward">Forward 10 seconds</string>
+    <string name="setup_title">Set up AudioFocus</string>
+    <string name="setup_description">Follow the steps below to enable overlay controls on top of YouTube playback.</string>
+    <string name="permission_overlay_title">Draw over other apps</string>
+    <string name="permission_accessibility_title">Accessibility service</string>
+    <string name="permission_notification_title">Notification access</string>
+    <string name="permission_action_grant">Grant access</string>
+    <string name="manual_controls_title">Manual controls</string>
+    <string name="manual_toggle_label">Pause overlay manually</string>
+    <string name="overlay_control_rewind">Rewind 10 seconds</string>
+    <string name="overlay_control_play">Play or pause</string>
+    <string name="overlay_control_forward">Forward 10 seconds</string>
 </resources>
