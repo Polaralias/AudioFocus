@@ -1,0 +1,13 @@
+{
+  "surface_classes": [
+    "SurfaceView",
+    "TextureView",
+    "PlayerView",
+    "YouTubePlayerView"
+  ],
+  "keywords": [
+    "video",
+    "player",
+    "now playing"
+  ]
+}

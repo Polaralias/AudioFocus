@@ -1,1 +1,6 @@
-# Add project-specific ProGuard rules here.
+-keep class com.polaralias.audiofocus.service.OverlayService { *; }
+-keep class com.polaralias.audiofocus.service.MediaNotificationListener { *; }
+-keep class com.polaralias.audiofocus.service.AccessWindowsService { *; }
+-keep class androidx.compose.** { *; }
+-keep class kotlin.Metadata { *; }
+-dontwarn androidx.compose.**
