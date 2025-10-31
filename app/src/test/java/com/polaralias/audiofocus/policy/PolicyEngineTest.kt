@@ -6,7 +6,12 @@ import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.window.WindowInfo
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class PolicyEngineTest {
     private val playingState = PlaybackState.Builder()
         .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
