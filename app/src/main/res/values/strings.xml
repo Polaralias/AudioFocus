@@ -9,7 +9,10 @@
     <string name="permission_notification">Notification access</string>
     <string name="permission_accessibility">Accessibility service</string>
     <string name="permission_status_granted">Granted</string>
+    <string name="permission_status_pending">Pending</string>
+    <string name="permission_status_blocked">Blocked</string>
     <string name="permission_status_denied">Not granted</string>
+    <string name="permission_action_manage">Manage access</string>
     <string name="touch_disclaimer">Some devices may block touches under overlays. Disable per-app rules if this interferes.</string>
     <string name="settings_description">Grant permissions so AudioFocus can show transport controls over YouTube video playback.</string>
     <string name="overlay_service_channel">AudioFocus overlay</string>
@@ -30,9 +33,20 @@
     <string name="permission_accessibility_title">Accessibility service</string>
     <string name="permission_notification_title">Notification access</string>
     <string name="permission_action_grant">Grant access</string>
+    <string name="permission_settings_error">Unable to open system settings. Please adjust manually.</string>
     <string name="manual_controls_title">Manual controls</string>
     <string name="manual_toggle_label">Pause overlay manually</string>
+    <string name="manual_status_paused">Paused</string>
+    <string name="manual_status_active">Active</string>
     <string name="overlay_control_rewind">Rewind 10 seconds</string>
     <string name="overlay_control_play">Play or pause</string>
+    <string name="overlay_control_pause">Pause</string>
     <string name="overlay_control_forward">Forward 10 seconds</string>
+    <string name="overlay_notification_action_resume">Resume overlay</string>
+    <string name="overlay_notification_action_pause">Pause overlay</string>
+    <string name="overlay_notification_content_paused">Overlay paused</string>
+    <string name="overlay_notification_content_active">Overlay active</string>
+    <string name="overlay_notification_title">AudioFocus overlay</string>
+    <string name="overlay_notification_channel_name">Overlay controls</string>
+    <string name="overlay_notification_channel_description">Persistent notification for overlay status.</string>
 </resources>
