@@ -7,6 +7,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import androidx.core.app.NotificationManagerCompat
 import com.polaralias.audiofocus.model.MediaState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,13 +19,15 @@ class MediaSessionMonitor(
     context: Context,
     private val scope: CoroutineScope
 ) {
-    private val sessionManager = context.getSystemService(MediaSessionManager::class.java)
+    private val appContext = context.applicationContext
+    private val sessionManager = appContext.getSystemService(MediaSessionManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
     private val listener = MediaSessionManager.OnActiveSessionsChangedListener { updateControllers(it) }
     private val _state = MutableStateFlow<MediaState>(MediaState.Idle)
     val state: StateFlow<MediaState> = _state
 
     private var controller: MediaController? = null
+    private var registered = false
     private val callback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
             publish(controller)
@@ -40,12 +43,26 @@ class MediaSessionMonitor(
     }
 
     fun start(componentName: ComponentName) {
-        sessionManager.addOnActiveSessionsChangedListener(listener, componentName, handler)
-        updateControllers(sessionManager.getActiveSessions(componentName))
+        if (!hasNotificationAccess()) {
+            unregisterListener()
+            bind(null)
+            return
+        }
+
+        try {
+            if (!registered) {
+                sessionManager.addOnActiveSessionsChangedListener(listener, componentName, handler)
+                registered = true
+            }
+            updateControllers(sessionManager.getActiveSessions(componentName))
+        } catch (security: SecurityException) {
+            unregisterListener()
+            bind(null)
+        }
     }
 
     fun stop() {
-        sessionManager.removeOnActiveSessionsChangedListener(listener)
+        unregisterListener()
         bind(null)
     }
 
@@ -53,6 +70,17 @@ class MediaSessionMonitor(
         val controller = controllers.orEmpty()
             .firstOrNull { it.packageName == YOUTUBE || it.packageName == YOUTUBE_MUSIC }
         bind(controller)
+    }
+
+    private fun unregisterListener() {
+        if (!registered) return
+        runCatching { sessionManager.removeOnActiveSessionsChangedListener(listener) }
+        registered = false
+    }
+
+    private fun hasNotificationAccess(): Boolean {
+        val enabledPackages = NotificationManagerCompat.getEnabledListenerPackages(appContext)
+        return appContext.packageName in enabledPackages
     }
 
     private fun bind(target: MediaController?) {
