@@ -7,4 +7,4 @@
     android:canRetrieveWindowContent="true"
     android:settingsActivity="com.polaralias.audiofocus.settings.SettingsActivity"
     android:packageNames="com.google.android.apps.youtube.music"
-    android:flags="flagReportViewIds|flagRetrieveInteractiveWindows" />
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows" />
