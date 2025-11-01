@@ -44,7 +44,7 @@ class SettingsActivity : ComponentActivity() {
             AudioFocusTheme {
                 val state by viewModel.uiState.collectAsState()
                 val activity = this@SettingsActivity
-                var hasStarted by remember { mutableStateOf(false) }
+                val hasStarted = remember { mutableStateOf(false) }
                 LaunchedEffect(
                     state.hasOverlayPermission,
                     state.hasAccessibilityAccess,
@@ -54,12 +54,12 @@ class SettingsActivity : ComponentActivity() {
                         state.hasOverlayPermission &&
                             state.hasAccessibilityAccess &&
                             state.hasNotificationAccess
-                    if (ready && !hasStarted) {
-                        hasStarted = true
+                    if (ready && !hasStarted.value) {
+                        hasStarted.value = true
                         OverlayService.start(activity)
                     }
                     if (!ready) {
-                        hasStarted = false
+                        hasStarted.value = false
                     }
                 }
                 SettingsScreen(
