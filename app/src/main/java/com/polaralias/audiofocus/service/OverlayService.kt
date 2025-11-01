@@ -6,7 +6,6 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.IBinder
 import android.os.SystemClock
 import android.view.View
@@ -15,6 +14,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
@@ -32,6 +32,7 @@ import com.polaralias.audiofocus.policy.PolicyInput
 import com.polaralias.audiofocus.ui.controls.ControlsOverlay
 import com.polaralias.audiofocus.ui.controls.ControlsUiState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
+import com.polaralias.audiofocus.ui.theme.audioFocusColorScheme
 import com.polaralias.audiofocus.window.WindowInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -242,7 +243,7 @@ class OverlayService : Service() {
             is OverlayState.Partial -> state.maskAlpha
             OverlayState.None -> 0f
         }
-        val backgroundColor = Color.argb((alpha * 255).toInt(), 0, 0, 0)
+        val backgroundColor = maskColor(alpha)
         val view = maskView as? FrameLayout ?: FrameLayout(this).also { frame ->
             frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             frame.setBackgroundColor(backgroundColor)
@@ -262,7 +263,7 @@ class OverlayService : Service() {
             is OverlayState.Partial -> state.maskAlpha
             OverlayState.None -> 0f
         }
-        (maskView as? FrameLayout)?.setBackgroundColor(Color.argb((alpha * 255).toInt(), 0, 0, 0))
+        (maskView as? FrameLayout)?.setBackgroundColor(maskColor(alpha))
     }
 
     private fun ensureControls() {
@@ -314,4 +315,11 @@ class OverlayService : Service() {
         val mediaState: MediaState,
         val overlayState: OverlayState
     )
+}
+
+private fun OverlayService.maskColor(alpha: Float): Int {
+    val scheme = audioFocusColorScheme(this)
+    val scrim = scheme.scrim
+    val resolvedAlpha = (scrim.alpha * alpha).coerceIn(0f, 1f)
+    return scrim.copy(alpha = resolvedAlpha).toArgb()
 }
