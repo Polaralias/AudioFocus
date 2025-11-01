@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Slider
@@ -39,12 +40,16 @@ fun ControlsOverlay(
     onSeekTo: (Long) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -60,7 +65,7 @@ fun ControlsOverlay(
                 Icon(
                     imageVector = Icons.Rounded.Replay10,
                     contentDescription = rewindDescription,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
             IconButton(onClick = {
@@ -84,7 +89,7 @@ fun ControlsOverlay(
                 Icon(
                     imageVector = Icons.Rounded.Forward10,
                     contentDescription = forwardDescription,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -119,14 +124,15 @@ fun ControlsOverlay(
             Text(
                 text = formatTimestamp(state.clampedPosition),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = formatTimestamp(state.safeDuration),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
+    }
     }
 }
 
