@@ -57,8 +57,10 @@ class SettingsActivity : ComponentActivity() {
                     if (ready && !hasStarted.value) {
                         hasStarted.value = true
                         OverlayService.start(activity)
-                    }
-                    if (!ready) {
+                    } else if (!ready && hasStarted.value) {
+                        hasStarted.value = false
+                        OverlayService.stop(activity)
+                    } else if (!ready) {
                         hasStarted.value = false
                     }
                 }

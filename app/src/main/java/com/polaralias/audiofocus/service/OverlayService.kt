@@ -73,8 +73,12 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_TOGGLE_PLAYBACK) {
-            commander?.togglePlayPause()
+        when (intent?.action) {
+            ACTION_TOGGLE_PLAYBACK -> commander?.togglePlayPause()
+            ACTION_STOP -> {
+                stopFromRequest()
+                return START_NOT_STICKY
+            }
         }
         startCollectors()
         return START_STICKY
@@ -217,7 +221,18 @@ class OverlayService : Service() {
     }
 
     private fun hideOverlay() {
-        if (currentOverlay == OverlayState.None) return
+        if (currentOverlay == OverlayState.None && maskView == null && controlsView == null) {
+            return
+        }
+        releaseOverlayResources()
+    }
+
+    private fun stopFromRequest() {
+        releaseOverlayResources()
+        stopSelf()
+    }
+
+    private fun releaseOverlayResources() {
         removeOverlays()
         tickerJob?.cancel()
         if (isForeground) {
@@ -226,7 +241,6 @@ class OverlayService : Service() {
         }
         OverlayNotification.cancel(this)
         currentOverlay = OverlayState.None
-        stopSelf()
     }
 
     private fun removeOverlays() {
@@ -305,9 +319,14 @@ class OverlayService : Service() {
 
     companion object {
         private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
+        private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
+        }
+
+        fun stop(context: Context) {
+            ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java).apply { action = ACTION_STOP })
         }
     }
 
