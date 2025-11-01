@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Slider
+import androidx.compose.material.SliderDefaults
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Forward10
@@ -101,7 +102,14 @@ fun ControlsOverlay(
             },
             valueRange = 0f..state.safeDuration.toFloat().coerceAtLeast(0f),
             enabled = state.canSeek,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.secondary,
+                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                activeTickColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+                inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f),
+                inactiveTickColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f)
+            )
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(
@@ -110,11 +118,13 @@ fun ControlsOverlay(
         ) {
             Text(
                 text = formatTimestamp(state.clampedPosition),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = formatTimestamp(state.safeDuration),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
