@@ -22,13 +22,17 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.polaralias.audiofocus.R
+import com.polaralias.audiofocus.service.OverlayService
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
 
 class SettingsActivity : ComponentActivity() {
@@ -39,6 +43,25 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             AudioFocusTheme {
                 val state by viewModel.uiState.collectAsState()
+                val activity = this@SettingsActivity
+                var hasStarted by remember { mutableStateOf(false) }
+                LaunchedEffect(
+                    state.hasOverlayPermission,
+                    state.hasAccessibilityAccess,
+                    state.hasNotificationAccess
+                ) {
+                    val ready =
+                        state.hasOverlayPermission &&
+                            state.hasAccessibilityAccess &&
+                            state.hasNotificationAccess
+                    if (ready && !hasStarted) {
+                        hasStarted = true
+                        OverlayService.start(activity)
+                    }
+                    if (!ready) {
+                        hasStarted = false
+                    }
+                }
                 SettingsScreen(
                     state = state,
                     onToggleYouTube = viewModel::setEnableYouTube,
