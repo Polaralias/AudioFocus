@@ -16,8 +16,10 @@ object OverlayLayoutFactory {
             )
             is OverlayState.Partial -> {
                 val displayHeight = context.resources.displayMetrics.heightPixels
-                val height = (displayHeight * state.heightRatio).toInt()
-                createMaskLayout(context, height = height)
+                val density = context.resources.displayMetrics.density
+                val additionalHeight = (CONTROL_SCRIM_HEIGHT_DP * density).toInt()
+                val height = (displayHeight * state.heightRatio).toInt() + additionalHeight
+                createMaskLayout(context, height = height.coerceAtMost(displayHeight))
             }
         }
     }
@@ -51,3 +53,5 @@ object OverlayLayoutFactory {
         }
     }
 }
+
+private const val CONTROL_SCRIM_HEIGHT_DP = 200f
