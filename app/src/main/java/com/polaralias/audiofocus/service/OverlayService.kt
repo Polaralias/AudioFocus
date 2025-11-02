@@ -69,6 +69,9 @@ class OverlayService : Service() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         preferences = PreferencesRepository(applicationContext)
         mediaMonitor = MediaSessionMonitor(this, scope)
+        val notification = buildNotification(isPlaying = false)
+        startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+        isForeground = true
         startCollectors()
     }
 
