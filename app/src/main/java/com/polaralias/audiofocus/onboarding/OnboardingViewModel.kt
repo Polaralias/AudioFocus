@@ -41,27 +41,29 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun checkPermissionsAndUpdateStep() {
         Log.d(TAG, "Checking permissions and updating step")
-        val context = getApplication<Application>()
-        val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
-        
-        val currentStep = when {
-            !permissionStatus.hasOverlayPermission -> OnboardingStep.OVERLAY
-            !permissionStatus.hasNotificationAccess -> OnboardingStep.NOTIFICATION
-            !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
-            else -> OnboardingStep.COMPLETE
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+            
+            val currentStep = when {
+                !permissionStatus.hasOverlayPermission -> OnboardingStep.OVERLAY
+                !permissionStatus.hasNotificationAccess -> OnboardingStep.NOTIFICATION
+                !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
+                else -> OnboardingStep.COMPLETE
+            }
+            
+            _uiState.update {
+                it.copy(
+                    currentStep = currentStep,
+                    hasOverlayPermission = permissionStatus.hasOverlayPermission,
+                    hasNotificationAccess = permissionStatus.hasNotificationAccess,
+                    hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
+                    showError = false
+                )
+            }
+            
+            Log.d(TAG, "Current step: $currentStep, All granted: ${permissionStatus.allPermissionsGranted}")
         }
-        
-        _uiState.update {
-            it.copy(
-                currentStep = currentStep,
-                hasOverlayPermission = permissionStatus.hasOverlayPermission,
-                hasNotificationAccess = permissionStatus.hasNotificationAccess,
-                hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
-                showError = false
-            )
-        }
-        
-        Log.d(TAG, "Current step: $currentStep, All granted: ${permissionStatus.allPermissionsGranted}")
     }
 
     fun onPermissionGranted() {
