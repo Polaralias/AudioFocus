@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -33,6 +34,7 @@ import com.polaralias.audiofocus.ui.controls.ControlsOverlay
 import com.polaralias.audiofocus.ui.controls.ControlsUiState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
 import com.polaralias.audiofocus.ui.theme.audioFocusColorScheme
+import com.polaralias.audiofocus.util.PermissionValidator
 import com.polaralias.audiofocus.window.WindowInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class OverlayService : Service() {
+    companion object {
+        private const val TAG = "OverlayService"
+        private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
+        private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
+
+        fun start(context: Context) {
+            Log.d(TAG, "Requesting service start")
+            ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
+        }
+
+        fun stop(context: Context) {
+            Log.d(TAG, "Requesting service stop")
+            ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java).apply { action = ACTION_STOP })
+        }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var windowManager: WindowManager
     private lateinit var mediaMonitor: MediaSessionMonitor
@@ -66,19 +84,42 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        preferences = PreferencesRepository(applicationContext)
-        mediaMonitor = MediaSessionMonitor(this, scope)
-        val notification = buildNotification(isPlaying = false)
-        startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-        isForeground = true
-        startCollectors()
+        Log.i(TAG, "OverlayService onCreate")
+        
+        // Validate permissions before initializing
+        val permissionStatus = PermissionValidator.checkPermissions(applicationContext, TAG)
+        if (!permissionStatus.allPermissionsGranted) {
+            Log.e(TAG, "Service started without required permissions: ${permissionStatus.getDiagnosticMessage()}")
+            Log.e(TAG, "Stopping service immediately to prevent crashes")
+            stopSelf()
+            return
+        }
+        
+        try {
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            preferences = PreferencesRepository(applicationContext)
+            mediaMonitor = MediaSessionMonitor(this, scope)
+            val notification = buildNotification(isPlaying = false)
+            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+            isForeground = true
+            startCollectors()
+            Log.i(TAG, "OverlayService initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing OverlayService", e)
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand: action=${intent?.action}")
+        
         when (intent?.action) {
-            ACTION_TOGGLE_PLAYBACK -> commander?.togglePlayPause()
+            ACTION_TOGGLE_PLAYBACK -> {
+                Log.d(TAG, "Toggle playback requested")
+                commander?.togglePlayPause()
+            }
             ACTION_STOP -> {
+                Log.i(TAG, "Stop action received")
                 stopFromRequest()
                 return START_NOT_STICKY
             }
@@ -90,45 +131,60 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        Log.i(TAG, "OverlayService onDestroy")
         super.onDestroy()
-        removeOverlays()
-        mediaMonitor.stop()
-        scope.cancel()
+        try {
+            removeOverlays()
+            mediaMonitor.stop()
+            scope.cancel()
+            Log.d(TAG, "OverlayService cleanup completed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during service cleanup", e)
+        }
     }
 
     private fun startCollectors() {
-        if (collectorsStarted) return
+        if (collectorsStarted) {
+            Log.d(TAG, "Collectors already started, skipping")
+            return
+        }
         collectorsStarted = true
+        Log.d(TAG, "Starting collectors")
+        
         val component = ComponentName(this, MediaNotificationListener::class.java)
         mediaMonitor.start(component)
         scope.launch {
-            combine(
-                mediaMonitor.state,
-                AccessWindowsService.windowInfo,
-                preferences.preferencesFlow
-            ) { media, windowInfo, prefs ->
-                val playback = when (media) {
-                    is MediaState.Playing -> media.playbackState
-                    is MediaState.Paused -> media.playbackState
-                    MediaState.Idle -> null
-                }
-                val metadata = when (media) {
-                    is MediaState.Playing -> media.metadata
-                    is MediaState.Paused -> media.metadata
-                    MediaState.Idle -> null
-                }
-                val overlay = PolicyEngine.compute(
-                    PolicyInput(
-                        packageName = media.controllerPackage(),
-                        playbackState = playback,
-                        metadata = metadata,
-                        windowInfo = if (windowInfo == WindowInfo.Empty) WindowInfo.Empty else windowInfo,
-                        preferences = prefs
+            try {
+                combine(
+                    mediaMonitor.state,
+                    AccessWindowsService.windowInfo,
+                    preferences.preferencesFlow
+                ) { media, windowInfo, prefs ->
+                    val playback = when (media) {
+                        is MediaState.Playing -> media.playbackState
+                        is MediaState.Paused -> media.playbackState
+                        MediaState.Idle -> null
+                    }
+                    val metadata = when (media) {
+                        is MediaState.Playing -> media.metadata
+                        is MediaState.Paused -> media.metadata
+                        MediaState.Idle -> null
+                    }
+                    val overlay = PolicyEngine.compute(
+                        PolicyInput(
+                            packageName = media.controllerPackage(),
+                            playbackState = playback,
+                            metadata = metadata,
+                            windowInfo = if (windowInfo == WindowInfo.Empty) WindowInfo.Empty else windowInfo,
+                            preferences = prefs
+                        )
                     )
-                )
-                OverlayRenderState(media, overlay)
-            }.collectLatest { renderState ->
-                applyRenderState(renderState)
+                    OverlayRenderState(media, overlay)
+                }.collectLatest { renderState ->
+                    applyRenderState(renderState)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in collectors", e)
             }
         }
     }
@@ -207,71 +263,120 @@ class OverlayService : Service() {
     }
 
     private fun showOverlay(state: OverlayState, isPlaying: Boolean) {
-        if (currentOverlay != state) {
-            createOrUpdateMask(state)
-        } else if (state !is OverlayState.None && maskView != null) {
-            updateMaskAlpha(state)
+        try {
+            Log.d(TAG, "Showing overlay: state=$state, isPlaying=$isPlaying")
+            if (currentOverlay != state) {
+                createOrUpdateMask(state)
+            } else if (state !is OverlayState.None && maskView != null) {
+                updateMaskAlpha(state)
+            }
+            ensureControls()
+            val notification = buildNotification(isPlaying)
+            if (!isForeground) {
+                startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+                isForeground = true
+            } else {
+                startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+            }
+            currentOverlay = state
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing overlay", e)
         }
-        ensureControls()
-        val notification = buildNotification(isPlaying)
-        if (!isForeground) {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-            isForeground = true
-        } else {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-        }
-        currentOverlay = state
     }
 
     private fun hideOverlay() {
         if (currentOverlay == OverlayState.None && maskView == null && controlsView == null) {
             return
         }
+        Log.d(TAG, "Hiding overlay")
         releaseOverlayResources()
     }
 
     private fun stopFromRequest() {
+        Log.i(TAG, "Stopping from request")
         releaseOverlayResources()
         stopSelf()
     }
 
     private fun releaseOverlayResources() {
-        removeOverlays()
-        tickerJob?.cancel()
-        if (isForeground) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            isForeground = false
+        Log.d(TAG, "Releasing overlay resources")
+        try {
+            removeOverlays()
+            tickerJob?.cancel()
+            if (isForeground) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                isForeground = false
+            }
+            OverlayNotification.cancel(this)
+            currentOverlay = OverlayState.None
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing overlay resources", e)
         }
-        OverlayNotification.cancel(this)
-        currentOverlay = OverlayState.None
     }
 
     private fun removeOverlays() {
-        maskView?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        controlsView?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        maskView = null
-        controlsView = null
+        Log.d(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
+        try {
+            maskView?.let { 
+                runCatching { 
+                    windowManager.removeViewImmediate(it) 
+                    Log.d(TAG, "Mask view removed")
+                }.onFailure { e ->
+                    Log.e(TAG, "Error removing mask view", e)
+                }
+            }
+            controlsView?.let { 
+                runCatching { 
+                    windowManager.removeViewImmediate(it)
+                    Log.d(TAG, "Controls view removed")
+                }.onFailure { e ->
+                    Log.e(TAG, "Error removing controls view", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during overlay removal", e)
+        } finally {
+            maskView = null
+            controlsView = null
+        }
     }
 
     private fun createOrUpdateMask(state: OverlayState) {
-        val params = OverlayLayoutFactory.maskLayoutFor(this, state) ?: return
-        val alpha = when (state) {
-            is OverlayState.Fullscreen -> state.maskAlpha
-            is OverlayState.Partial -> state.maskAlpha
-            OverlayState.None -> 0f
-        }
-        val backgroundColor = maskColor(alpha)
-        val view = maskView as? FrameLayout ?: FrameLayout(this).also { frame ->
-            frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            frame.setBackgroundColor(backgroundColor)
-            maskView = frame
-            windowManager.addView(frame, params)
+        try {
+            val params = OverlayLayoutFactory.maskLayoutFor(this, state)
+            if (params == null) {
+                Log.w(TAG, "Cannot create mask layout for state: $state")
+                return
+            }
+            
+            val alpha = when (state) {
+                is OverlayState.Fullscreen -> state.maskAlpha
+                is OverlayState.Partial -> state.maskAlpha
+                OverlayState.None -> 0f
+            }
+            val backgroundColor = maskColor(alpha)
+            val view = maskView as? FrameLayout ?: FrameLayout(this).also { frame ->
+                frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                frame.setBackgroundColor(backgroundColor)
+                maskView = frame
+                try {
+                    windowManager.addView(frame, params)
+                    Log.d(TAG, "Mask view created and added")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to add mask view to window manager", e)
+                    maskView = null
+                    throw e
+                }
+                currentOverlay = state
+                return
+            }
+            view.setBackgroundColor(backgroundColor)
+            windowManager.updateViewLayout(view, params)
+            Log.d(TAG, "Mask view updated")
             currentOverlay = state
-            return
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating or updating mask", e)
         }
-        view.setBackgroundColor(backgroundColor)
-        windowManager.updateViewLayout(view, params)
-        currentOverlay = state
     }
 
     private fun updateMaskAlpha(state: OverlayState) {
@@ -284,24 +389,35 @@ class OverlayService : Service() {
     }
 
     private fun ensureControls() {
-        if (controlsView != null) return
-        val composeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            setContent {
-                AudioFocusTheme {
-                    val state by controlsState.collectAsState()
-                    ControlsOverlay(
-                        state = state,
-                        onTogglePlayPause = { commander?.togglePlayPause() },
-                        onSeekBy = { commander?.seekBy(it) },
-                        onSeekTo = { commander?.seekTo(it) }
-                    )
+        if (controlsView != null) {
+            Log.d(TAG, "Controls view already exists")
+            return
+        }
+        
+        try {
+            Log.d(TAG, "Creating controls view")
+            val composeView = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                setContent {
+                    AudioFocusTheme {
+                        val state by controlsState.collectAsState()
+                        ControlsOverlay(
+                            state = state,
+                            onTogglePlayPause = { commander?.togglePlayPause() },
+                            onSeekBy = { commander?.seekBy(it) },
+                            onSeekTo = { commander?.seekTo(it) }
+                        )
+                    }
                 }
             }
+            val params = OverlayLayoutFactory.controlsLayout()
+            windowManager.addView(composeView, params)
+            controlsView = composeView
+            Log.d(TAG, "Controls view created and added")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create controls view", e)
+            controlsView = null
         }
-        val params = OverlayLayoutFactory.controlsLayout()
-        windowManager.addView(composeView, params)
-        controlsView = composeView
     }
 
     private fun buildNotification(isPlaying: Boolean) : android.app.Notification {
@@ -318,19 +434,6 @@ class OverlayService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return OverlayNotification.build(this, isPlaying, toggleIntent, contentIntent)
-    }
-
-    companion object {
-        private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
-        private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
-
-        fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
-        }
-
-        fun stop(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java).apply { action = ACTION_STOP })
-        }
     }
 
     private data class OverlayRenderState(

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -36,10 +37,15 @@ import com.polaralias.audiofocus.service.OverlayService
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
 
 class SettingsActivity : ComponentActivity() {
+    companion object {
+        private const val TAG = "SettingsActivity"
+    }
+
     private val viewModel: SettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "SettingsActivity created")
         setContent {
             AudioFocusTheme {
                 val state by viewModel.uiState.collectAsState()
@@ -55,12 +61,15 @@ class SettingsActivity : ComponentActivity() {
                             state.hasAccessibilityAccess &&
                             state.hasNotificationAccess
                     if (ready && !hasStarted.value) {
+                        Log.i(TAG, "All permissions granted, starting OverlayService")
                         hasStarted.value = true
                         OverlayService.start(activity)
                     } else if (!ready && hasStarted.value) {
+                        Log.w(TAG, "Permissions revoked, stopping OverlayService")
                         hasStarted.value = false
                         OverlayService.stop(activity)
                     } else if (!ready) {
+                        Log.w(TAG, "Cannot start service: ${state.permissionDiagnostic}")
                         hasStarted.value = false
                     }
                 }
@@ -80,10 +89,12 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "SettingsActivity resumed, refreshing permissions")
         viewModel.refreshPermissions()
     }
 
     private fun openOverlayPermission() {
+        Log.d(TAG, "Opening overlay permission settings")
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
             Uri.parse("package:$packageName")
@@ -92,10 +103,12 @@ class SettingsActivity : ComponentActivity() {
     }
 
     private fun openNotificationAccess() {
+        Log.d(TAG, "Opening notification access settings")
         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
     }
 
     private fun openAccessibilitySettings() {
+        Log.d(TAG, "Opening accessibility settings")
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 }
@@ -120,6 +133,29 @@ private fun SettingsScreen(
     ) {
         Text(text = stringResource(id = R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
         Text(text = stringResource(id = R.string.settings_description), style = MaterialTheme.typography.bodyMedium)
+        
+        // Display permission diagnostic if any permissions are missing
+        if (state.permissionDiagnostic.isNotEmpty() && 
+            (!state.hasOverlayPermission || !state.hasNotificationAccess || !state.hasAccessibilityAccess)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "⚠️ Permission Status",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = state.permissionDiagnostic,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        
         ToggleRow(
             title = stringResource(id = R.string.toggle_youtube),
             checked = state.preferences.enableYouTube,
