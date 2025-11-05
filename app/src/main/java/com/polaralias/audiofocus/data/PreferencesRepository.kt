@@ -18,6 +18,7 @@ class PreferencesRepository(private val context: Context) {
     private val enableYoutubeMusicKey = booleanPreferencesKey("enable_youtube_music")
     private val startOnBootKey = booleanPreferencesKey("start_on_boot")
     private val dimAmountKey = floatPreferencesKey("dim_amount")
+    private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
 
     val preferencesFlow: Flow<OverlayPreferences> = context.dataStore.data.map { prefs ->
         OverlayPreferences(
@@ -42,6 +43,15 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setDimAmount(alpha: Float) {
         context.dataStore.edit { it[dimAmountKey] = alpha.coerceIn(0.2f, 1f) }
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { it[onboardingCompletedKey] = completed }
+    }
+
+    suspend fun isOnboardingCompleted(): Boolean {
+        val prefs = context.dataStore.data.first()
+        return prefs[onboardingCompletedKey] ?: false
     }
 
     suspend fun current(): OverlayPreferences {

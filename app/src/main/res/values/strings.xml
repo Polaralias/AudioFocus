@@ -49,4 +49,23 @@
     <string name="overlay_notification_title">AudioFocus overlay</string>
     <string name="overlay_notification_channel_name">Overlay controls</string>
     <string name="overlay_notification_channel_description">Persistent notification for overlay status.</string>
+    
+    <!-- Onboarding strings -->
+    <string name="onboarding_welcome_title">Welcome to AudioFocus</string>
+    <string name="onboarding_welcome_message">AudioFocus needs several permissions to show transport controls over YouTube video playback. Let\'s set them up.</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_overlay_title">Overlay Permission</string>
+    <string name="onboarding_overlay_rationale">AudioFocus needs to draw over other apps to show transport controls on top of YouTube.</string>
+    <string name="onboarding_notification_title">Notification Listener Access</string>
+    <string name="onboarding_notification_rationale">AudioFocus needs notification access to monitor YouTube media sessions and control playback.</string>
+    <string name="onboarding_accessibility_title">Accessibility Service</string>
+    <string name="onboarding_accessibility_rationale">AudioFocus needs accessibility access to detect when YouTube is in fullscreen mode.</string>
+    <string name="onboarding_grant_permission">Grant Permission</string>
+    <string name="onboarding_permission_granted">Permission Granted ✓</string>
+    <string name="onboarding_complete_title">Setup Complete</string>
+    <string name="onboarding_complete_message">All permissions have been granted. AudioFocus is ready to use!</string>
+    <string name="onboarding_finish">Finish</string>
+    <string name="onboarding_error_title">Permission Required</string>
+    <string name="onboarding_error_message">AudioFocus requires all permissions to function. Please grant the permission to continue.</string>
+    <string name="onboarding_retry">Retry</string>
 </resources>
