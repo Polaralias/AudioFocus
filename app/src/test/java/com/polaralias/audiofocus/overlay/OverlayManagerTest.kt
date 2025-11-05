@@ -8,7 +8,12 @@ import com.polaralias.audiofocus.state.WindowSnapshot
 import com.polaralias.audiofocus.state.WindowState
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class OverlayManagerTest {
     private val manager = OverlayManager()
 
@@ -134,6 +139,60 @@ class OverlayManagerTest {
             )
 
             assertEquals("State $state should map to $expected", expected, command)
+        }
+    }
+
+    @Test
+    fun `youtube music audio only playback never shows overlay`() {
+        // YouTube Music audio-only should never show overlay regardless of window state
+        WindowState.values().forEach { windowState ->
+            val command = manager.evaluate(
+                windowSnapshot = WindowSnapshot(SupportedApp.YOUTUBE_MUSIC, windowState),
+                playbackSnapshot = PlaybackSnapshot(
+                    app = SupportedApp.YOUTUBE_MUSIC,
+                    activity = PlaybackActivity.PLAYING,
+                    contentType = PlaybackContentType.AUDIO_ONLY,
+                ),
+                manualPause = false,
+            )
+
+            assertEquals(
+                "YouTube Music audio-only with $windowState should hide overlay",
+                OverlayCommand.Hide,
+                command
+            )
+        }
+    }
+
+    @Test
+    fun `all edge case combinations hide overlay correctly`() {
+        // Test combinations of edge cases
+        val edgeCases = listOf(
+            // Manual pause with everything else valid
+            Triple(true, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), youtubeVideoPlayback),
+            // Null window
+            Triple(false, null, youtubeVideoPlayback),
+            // Null playback
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), null),
+            // App mismatch
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), youtubeMusicVideoPlayback),
+            // Paused state
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), 
+                youtubeVideoPlayback.copy(activity = PlaybackActivity.PAUSED)),
+            // Unknown content type
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), 
+                youtubeVideoPlayback.copy(contentType = PlaybackContentType.UNKNOWN)),
+            // Unknown window state
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.UNKNOWN), youtubeVideoPlayback),
+        )
+
+        edgeCases.forEach { (manualPause, window, playback) ->
+            val command = manager.evaluate(window, playback, manualPause)
+            assertEquals(
+                "Edge case should hide overlay: manualPause=$manualPause, window=$window, playback=$playback",
+                OverlayCommand.Hide,
+                command
+            )
         }
     }
 }
