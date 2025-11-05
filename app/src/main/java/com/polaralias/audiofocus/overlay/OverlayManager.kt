@@ -59,16 +59,8 @@ class OverlayManager {
         }
 
         // Strict enforcement: Only show overlay when STATE_PLAYING and content is VIDEO
-        val isPlaying = playback.activity == PlaybackActivity.PLAYING
-        val isVideo = playback.contentType == PlaybackContentType.VIDEO
-        
-        if (!isPlaying) {
-            Log.d(TAG, "Playback not in PLAYING state (current: ${playback.activity}), hiding overlay")
-            return OverlayCommand.Hide
-        }
-        
-        if (!isVideo) {
-            Log.d(TAG, "Content is not video (current: ${playback.contentType}), hiding overlay")
+        if (playback.activity != PlaybackActivity.PLAYING || playback.contentType != PlaybackContentType.VIDEO) {
+            Log.d(TAG, "Not showing overlay - activity: ${playback.activity}, contentType: ${playback.contentType}")
             return OverlayCommand.Hide
         }
 

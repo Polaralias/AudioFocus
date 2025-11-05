@@ -192,7 +192,10 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             ?: DEFAULT_YTM_CACHE_KEY
 
         val contentType = contentTypeCache.getOrPut(key) {
-            // These are custom YouTube Music metadata keys not in the standard MediaMetadata constants
+            // Custom YouTube Music metadata keys for video detection
+            // VIDEO_WIDTH and VIDEO_HEIGHT: Dimensions in pixels when video content is present (0 for audio-only)
+            // PRESENTATION_DISPLAY_TYPE: Type indicator where 1 = video, other values = audio-only
+            // These are not in standard MediaMetadata constants but are set by YouTube Music app
             @Suppress("WrongConstant")
             val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
             @Suppress("WrongConstant")
