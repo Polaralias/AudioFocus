@@ -359,14 +359,8 @@ class OverlayService : Service() {
                 frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 frame.setBackgroundColor(backgroundColor)
                 maskView = frame
-                try {
-                    windowManager.addView(frame, params)
-                    Log.d(TAG, "Mask view created and added")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to add mask view to window manager", e)
-                    maskView = null
-                    throw e
-                }
+                windowManager.addView(frame, params)
+                Log.d(TAG, "Mask view created and added")
                 currentOverlay = state
                 return
             }
@@ -376,6 +370,8 @@ class OverlayService : Service() {
             currentOverlay = state
         } catch (e: Exception) {
             Log.e(TAG, "Error creating or updating mask", e)
+            // Clean up on failure to prevent inconsistent state
+            maskView = null
         }
     }
 

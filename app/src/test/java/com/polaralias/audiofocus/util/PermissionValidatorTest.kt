@@ -6,6 +6,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import com.polaralias.audiofocus.service.AccessWindowsService
+import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,16 +25,16 @@ class PermissionValidatorTest {
     fun `checkPermissions returns all false when no permissions granted`() {
         val status = PermissionValidator.checkPermissions(context)
         
-        assert(!status.hasOverlayPermission)
-        assert(!status.hasNotificationAccess)
-        assert(!status.hasAccessibilityAccess)
-        assert(!status.allPermissionsGranted)
+        assertFalse(status.hasOverlayPermission)
+        assertFalse(status.hasNotificationAccess)
+        assertFalse(status.hasAccessibilityAccess)
+        assertFalse(status.allPermissionsGranted)
     }
 
     @Test
     fun `validateAllPermissions returns false when permissions missing`() {
         val result = PermissionValidator.validateAllPermissions(context)
-        assert(!result)
+        assertFalse(result)
     }
 
     @Test
@@ -41,10 +42,10 @@ class PermissionValidatorTest {
         val status = PermissionValidator.checkPermissions(context)
         val missing = status.getMissingPermissions()
         
-        assert(missing.size == 3)
-        assert(missing.contains("Overlay Permission"))
-        assert(missing.contains("Notification Access"))
-        assert(missing.contains("Accessibility Access"))
+        assertEquals(3, missing.size)
+        assertTrue(missing.contains("Overlay Permission"))
+        assertTrue(missing.contains("Notification Access"))
+        assertTrue(missing.contains("Accessibility Access"))
     }
 
     @Test
@@ -52,10 +53,10 @@ class PermissionValidatorTest {
         val status = PermissionValidator.checkPermissions(context)
         val message = status.getDiagnosticMessage()
         
-        assert(message.contains("Missing permissions"))
-        assert(message.contains("Overlay Permission"))
-        assert(message.contains("Notification Access"))
-        assert(message.contains("Accessibility Access"))
+        assertTrue(message.contains("Missing permissions"))
+        assertTrue(message.contains("Overlay Permission"))
+        assertTrue(message.contains("Notification Access"))
+        assertTrue(message.contains("Accessibility Access"))
     }
 
     @Test
@@ -67,7 +68,7 @@ class PermissionValidatorTest {
         )
         
         val message = status.getDiagnosticMessage()
-        assert(message == "All permissions granted")
+        assertEquals("All permissions granted", message)
     }
 
     @Test
@@ -78,7 +79,7 @@ class PermissionValidatorTest {
             hasAccessibilityAccess = true
         )
         
-        assert(status.allPermissionsGranted)
+        assertTrue(status.allPermissionsGranted)
     }
 
     @Test
@@ -88,20 +89,20 @@ class PermissionValidatorTest {
             hasNotificationAccess = true,
             hasAccessibilityAccess = true
         )
-        assert(!status1.allPermissionsGranted)
+        assertFalse(status1.allPermissionsGranted)
         
         val status2 = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = false,
             hasAccessibilityAccess = true
         )
-        assert(!status2.allPermissionsGranted)
+        assertFalse(status2.allPermissionsGranted)
         
         val status3 = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = true,
             hasAccessibilityAccess = false
         )
-        assert(!status3.allPermissionsGranted)
+        assertFalse(status3.allPermissionsGranted)
     }
 }
