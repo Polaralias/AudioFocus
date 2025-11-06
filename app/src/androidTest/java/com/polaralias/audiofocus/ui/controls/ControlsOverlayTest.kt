@@ -54,4 +54,39 @@ class ControlsOverlayTest {
         assertTrue(events.contains("seekBy:10000"))
         assertTrue(events.any { it.startsWith("seekTo:") })
     }
+
+    @Test
+    fun controlsInvokeTransportCallbacksInPartialMode() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            AudioFocusTheme {
+                ControlsOverlay(
+                    state = ControlsUiState(
+                        isVisible = true,
+                        isPlaying = true,
+                        position = 1_000L,
+                        duration = 10_000L,
+                        canSeek = true,
+                        canSeekBy = true,
+                        isPartialOverlay = true
+                    ),
+                    onTogglePlayPause = { events.add("toggle") },
+                    onSeekBy = { events.add("seekBy:$it") },
+                    onSeekTo = { events.add("seekTo:$it") }
+                )
+            }
+        }
+
+        val context = composeRule.activity
+        composeRule.onNodeWithContentDescription(context.getString(R.string.control_play)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.control_rewind)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.control_forward)).performClick()
+        composeRule.onNodeWithRole(Role.Slider)
+            .performSemanticsAction(SemanticsActions.SetProgress) { action -> action(5_000f) }
+
+        assertTrue(events.contains("toggle"))
+        assertTrue(events.contains("seekBy:-10000"))
+        assertTrue(events.contains("seekBy:10000"))
+        assertTrue(events.any { it.startsWith("seekTo:") })
+    }
 }
