@@ -291,12 +291,11 @@ class OverlayService : Service() {
         
         currentOverlay = state
         
+        // Update notification
         val notification = buildNotification(isPlaying)
+        startForeground(OverlayNotification.NOTIFICATION_ID, notification)
         if (!isForeground) {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
             isForeground = true
-        } else {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
         }
     }
 
@@ -384,6 +383,8 @@ class OverlayService : Service() {
                 visibility = View.GONE // Start hidden
                 alpha = 0f
             }
+            // Use Fullscreen state for initial layout params (will be updated later based on actual state)
+            // Fullscreen params work for all states as they cover the entire screen
             val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen())
             if (maskParams != null) {
                 windowManager.addView(maskFrame, maskParams)
@@ -462,14 +463,12 @@ class OverlayService : Service() {
         
         if (visible) {
             // Make views visible with fade-in animation
+            // Note: OverlayAnimator.fadeIn handles setting visibility internally
             maskView?.let { view ->
-                if (view.visibility != View.VISIBLE) {
-                    view.visibility = View.VISIBLE
+                if (view.visibility != View.VISIBLE || view.alpha < 1f) {
                     scope.launch {
                         try {
-                            if (view.alpha < 1f) {
-                                OverlayAnimator.fadeIn(view)
-                            }
+                            OverlayAnimator.fadeIn(view)
                         } catch (e: Exception) {
                             Log.e(TAG, "Error animating mask fade-in", e)
                         }
@@ -478,13 +477,10 @@ class OverlayService : Service() {
             }
             
             controlsView?.let { view ->
-                if (view.visibility != View.VISIBLE) {
-                    view.visibility = View.VISIBLE
+                if (view.visibility != View.VISIBLE || view.alpha < 1f) {
                     scope.launch {
                         try {
-                            if (view.alpha < 1f) {
-                                OverlayAnimator.fadeIn(view)
-                            }
+                            OverlayAnimator.fadeIn(view)
                         } catch (e: Exception) {
                             Log.e(TAG, "Error animating controls fade-in", e)
                         }
@@ -493,6 +489,7 @@ class OverlayService : Service() {
             }
         } else {
             // Hide views with fade-out animation, then set GONE
+            // Note: OverlayAnimator.fadeOut handles setting visibility to GONE internally
             hideAnimationJob?.cancel()
             hideAnimationJob = scope.launch {
                 try {
@@ -509,19 +506,15 @@ class OverlayService : Service() {
                         }
                         maskJob.await()
                         controlsJob.await()
-                        
-                        // Set visibility to GONE after animation completes
-                        mask?.visibility = View.GONE
-                        controls?.visibility = View.GONE
                     }
                     
                     // Track that overlay is no longer visible
                     lastVisibleState = OverlayState.None
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during hide animation", e)
-                    // Fall back to immediate hide
-                    maskView?.visibility = View.GONE
-                    controlsView?.visibility = View.GONE
+                    // Fall back to immediate hide on error
+                    maskView?.let { OverlayAnimator.hideImmediate(it) }
+                    controlsView?.let { OverlayAnimator.hideImmediate(it) }
                     lastVisibleState = OverlayState.None
                 }
             }
