@@ -25,6 +25,7 @@ import com.polaralias.audiofocus.model.MediaState
 import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.model.controllerPackage
 import com.polaralias.audiofocus.overlay.MediaTransportCommander
+import com.polaralias.audiofocus.overlay.OverlayAnimator
 import com.polaralias.audiofocus.overlay.OverlayLayoutFactory
 import com.polaralias.audiofocus.overlay.OverlayNotification
 import com.polaralias.audiofocus.overlay.TransportCommander
@@ -81,6 +82,7 @@ class OverlayService : Service() {
     private var latestDuration: Long = 0L
     private var tickerJob: Job? = null
     private var collectorsStarted = false
+    private var hideAnimationJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -266,12 +268,40 @@ class OverlayService : Service() {
     private fun showOverlay(state: OverlayState, isPlaying: Boolean) {
         try {
             Log.d(TAG, "Showing overlay: state=$state, isPlaying=$isPlaying")
-            if (currentOverlay != state) {
+            
+            // Cancel any ongoing hide animation
+            hideAnimationJob?.cancel()
+            hideAnimationJob = null
+            
+            val isNewOverlay = currentOverlay != state
+            
+            if (isNewOverlay) {
                 createOrUpdateMask(state)
             } else if (state !is OverlayState.None && maskView != null) {
                 updateMaskAlpha(state)
             }
             ensureControls()
+            
+            // Animate views if they were just created
+            if (isNewOverlay) {
+                scope.launch {
+                    try {
+                        maskView?.let { view ->
+                            if (view.alpha < 1f) {
+                                OverlayAnimator.fadeIn(view)
+                            }
+                        }
+                        controlsView?.let { view ->
+                            if (view.alpha < 1f) {
+                                OverlayAnimator.fadeIn(view)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error animating overlay views", e)
+                    }
+                }
+            }
+            
             val notification = buildNotification(isPlaying)
             if (!isForeground) {
                 startForeground(OverlayNotification.NOTIFICATION_ID, notification)
@@ -290,7 +320,36 @@ class OverlayService : Service() {
             return
         }
         Log.d(TAG, "Hiding overlay")
-        releaseOverlayResources()
+        
+        // Cancel any previous hide animation
+        hideAnimationJob?.cancel()
+        
+        // Animate fade-out, then release resources
+        hideAnimationJob = scope.launch {
+            try {
+                val mask = maskView
+                val controls = controlsView
+                
+                // Fade out both views in parallel
+                if (mask != null || controls != null) {
+                    launch {
+                        mask?.let { OverlayAnimator.fadeOut(it) }
+                    }
+                    launch {
+                        controls?.let { OverlayAnimator.fadeOut(it) }
+                    }
+                    // Wait for both animations to complete (200ms)
+                    delay(210L) // Slightly longer than animation to ensure completion
+                }
+                
+                // Now release resources after animation completes
+                releaseOverlayResources()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during hide animation", e)
+                // Fall back to immediate cleanup on error
+                releaseOverlayResources()
+            }
+        }
     }
 
     private fun stopFromRequest() {
@@ -302,6 +361,10 @@ class OverlayService : Service() {
     private fun releaseOverlayResources() {
         Log.d(TAG, "Releasing overlay resources")
         try {
+            // Cancel any ongoing animations
+            hideAnimationJob?.cancel()
+            hideAnimationJob = null
+            
             removeOverlays()
             tickerJob?.cancel()
             if (isForeground) {
@@ -319,7 +382,9 @@ class OverlayService : Service() {
         Log.d(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
         try {
             maskView?.let { 
-                runCatching { 
+                runCatching {
+                    // Ensure animations are cancelled before removal
+                    OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it) 
                     Log.d(TAG, "Mask view removed")
                 }.onFailure { e ->
@@ -327,7 +392,9 @@ class OverlayService : Service() {
                 }
             }
             controlsView?.let { 
-                runCatching { 
+                runCatching {
+                    // Ensure animations are cancelled before removal
+                    OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it)
                     Log.d(TAG, "Controls view removed")
                 }.onFailure { e ->
