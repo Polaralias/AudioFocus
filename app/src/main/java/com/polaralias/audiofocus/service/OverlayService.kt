@@ -41,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -330,16 +331,17 @@ class OverlayService : Service() {
                 val mask = maskView
                 val controls = controlsView
                 
-                // Fade out both views in parallel
+                // Fade out both views in parallel and wait for completion
                 if (mask != null || controls != null) {
-                    launch {
+                    val maskJob = async {
                         mask?.let { OverlayAnimator.fadeOut(it) }
                     }
-                    launch {
+                    val controlsJob = async {
                         controls?.let { OverlayAnimator.fadeOut(it) }
                     }
-                    // Wait for both animations to complete (200ms)
-                    delay(210L) // Slightly longer than animation to ensure completion
+                    // Wait for both animations to actually complete
+                    maskJob.await()
+                    controlsJob.await()
                 }
                 
                 // Now release resources after animation completes
