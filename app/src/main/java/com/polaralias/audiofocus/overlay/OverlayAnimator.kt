@@ -13,11 +13,12 @@ object OverlayAnimator {
 
     /**
      * Animates a view fade-in from alpha 0 to 1.
+     * Sets alpha to 0 at the start to ensure consistent animation behavior.
      * Suspends until animation completes.
      */
     suspend fun fadeIn(view: View) {
         suspendCancellableCoroutine { continuation ->
-            view.alpha = 0f
+            view.alpha = 0f  // Ensure consistent starting point
             view.visibility = View.VISIBLE
             
             view.animate()
