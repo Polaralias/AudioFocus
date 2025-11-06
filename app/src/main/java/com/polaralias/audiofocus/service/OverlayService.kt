@@ -55,6 +55,14 @@ class OverlayService : Service() {
         private const val TAG = "OverlayService"
         private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
         private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
+        
+        // Debounce period: Wait this long before applying state changes to prevent flicker
+        // on rapid state transitions (e.g., transient window state changes during animations)
+        private const val DEBOUNCE_DELAY_MS = 300L
+        
+        // Grace period: Once overlay is visible, tolerate brief "hide" signals for this duration
+        // This prevents overlay from disappearing during momentary detection mismatches
+        private const val GRACE_PERIOD_MS = 500L
 
         fun start(context: Context) {
             Log.d(TAG, "Requesting service start")
@@ -84,6 +92,13 @@ class OverlayService : Service() {
     private var tickerJob: Job? = null
     private var collectorsStarted = false
     private var hideAnimationJob: Job? = null
+    
+    // Debounce mechanism: Track pending overlay state changes to prevent flickering
+    // Grace period allows tolerating brief mismatches in detection without hiding overlay
+    private var pendingOverlayState: OverlayState? = null
+    private var debounceJob: Job? = null
+    private var lastVisibleState: OverlayState = OverlayState.None
+    private var lastVisibleTimestamp: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -105,8 +120,14 @@ class OverlayService : Service() {
             val notification = buildNotification(isPlaying = false)
             startForeground(OverlayNotification.NOTIFICATION_ID, notification)
             isForeground = true
+            
+            // NEW BEHAVIOR: Attach overlay views immediately when service starts
+            // This keeps views present (like AudioFocus_old), we'll control visibility via alpha/visibility
+            // Views stay attached as long as overlay permission is granted and service is running
+            attachOverlayViews()
+            
             startCollectors()
-            Log.i(TAG, "OverlayService initialized successfully")
+            Log.i(TAG, "OverlayService initialized successfully with overlay views attached")
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing OverlayService", e)
             stopSelf()
@@ -195,9 +216,87 @@ class OverlayService : Service() {
     private fun applyRenderState(renderState: OverlayRenderState) {
         updateCommander(renderState.mediaState)
         updateControls(renderState.mediaState, renderState.overlayState)
-        when (val overlay = renderState.overlayState) {
-            OverlayState.None -> hideOverlay()
-            else -> showOverlay(overlay, renderState.mediaState is MediaState.Playing)
+        
+        // NEW BEHAVIOR: Use debouncing and grace period to prevent flicker
+        // Instead of immediately showing/hiding overlay, we schedule the change with a delay
+        // This allows us to ignore transient state changes and rapid transitions
+        applyOverlayStateWithDebounce(renderState.overlayState, renderState.mediaState is MediaState.Playing)
+    }
+    
+    /**
+     * Apply overlay state with debounce and grace period logic.
+     * 
+     * DEBOUNCE: Wait DEBOUNCE_DELAY_MS before applying state changes. If multiple state changes
+     * arrive within this window, only the last one is applied. This prevents flickering during
+     * rapid transitions (e.g., during app UI animations or window state changes).
+     * 
+     * GRACE PERIOD: Once overlay is visible, we tolerate "hide" commands for GRACE_PERIOD_MS
+     * before actually hiding. This prevents momentary detection mismatches from causing the
+     * overlay to disappear. If a "show" command arrives during grace period, we cancel the hide.
+     * 
+     * This approach keeps overlay views attached (like old app) but controls visibility in-place.
+     */
+    private fun applyOverlayStateWithDebounce(newState: OverlayState, isPlaying: Boolean) {
+        // Cancel any pending debounce job
+        debounceJob?.cancel()
+        
+        // Store the pending state
+        pendingOverlayState = newState
+        
+        // If requesting to hide but we recently showed overlay, apply grace period
+        if (newState is OverlayState.None && lastVisibleState !is OverlayState.None) {
+            val timeSinceVisible = System.currentTimeMillis() - lastVisibleTimestamp
+            if (timeSinceVisible < GRACE_PERIOD_MS) {
+                Log.d(TAG, "Grace period active (${timeSinceVisible}ms < ${GRACE_PERIOD_MS}ms), delaying hide")
+                // Schedule hide after remaining grace period
+                val remainingGrace = GRACE_PERIOD_MS - timeSinceVisible
+                debounceJob = scope.launch {
+                    delay(remainingGrace)
+                    applyOverlayStateImmediate(newState, isPlaying)
+                }
+                return
+            }
+        }
+        
+        // Apply state change after debounce delay
+        debounceJob = scope.launch {
+            delay(DEBOUNCE_DELAY_MS)
+            applyOverlayStateImmediate(newState, isPlaying)
+        }
+    }
+    
+    /**
+     * Immediately apply overlay state by updating view visibility.
+     * 
+     * NEW BEHAVIOR: Views remain attached to WindowManager. We control visibility using
+     * View.VISIBLE and View.GONE (or alpha for smooth transitions). This prevents the
+     * add/remove overhead and potential flickering from repeated WindowManager operations.
+     */
+    private fun applyOverlayStateImmediate(state: OverlayState, isPlaying: Boolean) {
+        Log.d(TAG, "Applying overlay state: $state (isPlaying=$isPlaying)")
+        
+        when (state) {
+            OverlayState.None -> setOverlayVisibility(visible = false, isPlaying)
+            else -> {
+                updateMaskForState(state)
+                setOverlayVisibility(visible = true, isPlaying)
+                
+                // Track when overlay became visible for grace period
+                if (lastVisibleState is OverlayState.None) {
+                    lastVisibleTimestamp = System.currentTimeMillis()
+                }
+                lastVisibleState = state
+            }
+        }
+        
+        currentOverlay = state
+        
+        val notification = buildNotification(isPlaying)
+        if (!isForeground) {
+            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+            isForeground = true
+        } else {
+            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
         }
     }
 
@@ -265,91 +364,166 @@ class OverlayService : Service() {
             }
         }
     }
-
-    private fun showOverlay(state: OverlayState, isPlaying: Boolean) {
+    
+    /**
+     * Attach overlay views to WindowManager early (onCreate).
+     * NEW BEHAVIOR: Views are attached once and kept attached (like AudioFocus_old).
+     * We control visibility in-place rather than repeatedly adding/removing views.
+     * This provides better startup reliability and prevents flickering.
+     */
+    private fun attachOverlayViews() {
         try {
-            Log.d(TAG, "Showing overlay: state=$state, isPlaying=$isPlaying")
+            Log.d(TAG, "Attaching overlay views to WindowManager")
             
-            // Cancel any ongoing hide animation
-            hideAnimationJob?.cancel()
-            hideAnimationJob = null
-            
-            val isNewOverlay = currentOverlay != state
-            
-            if (isNewOverlay) {
-                createOrUpdateMask(state)
-            } else if (state !is OverlayState.None && maskView != null) {
-                updateMaskAlpha(state)
+            // Create and attach mask view (initially hidden)
+            val maskFrame = FrameLayout(this).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                visibility = View.GONE // Start hidden
+                alpha = 0f
             }
-            ensureControls()
+            val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen())
+            if (maskParams != null) {
+                windowManager.addView(maskFrame, maskParams)
+                maskView = maskFrame
+                Log.d(TAG, "Mask view attached")
+            }
             
-            // Animate views if they were just created
-            if (isNewOverlay) {
-                scope.launch {
-                    try {
-                        maskView?.let { view ->
-                            if (view.alpha < 1f) {
-                                OverlayAnimator.fadeIn(view)
-                            }
-                        }
-                        controlsView?.let { view ->
-                            if (view.alpha < 1f) {
-                                OverlayAnimator.fadeIn(view)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error animating overlay views", e)
+            // Create and attach controls view (initially hidden)
+            val composeView = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                visibility = View.GONE // Start hidden
+                alpha = 0f
+                setContent {
+                    AudioFocusTheme {
+                        val state by controlsState.collectAsState()
+                        ControlsOverlay(
+                            state = state,
+                            onTogglePlayPause = { commander?.togglePlayPause() },
+                            onSeekBy = { commander?.seekBy(it) },
+                            onSeekTo = { commander?.seekTo(it) }
+                        )
                     }
                 }
             }
+            val controlsParams = OverlayLayoutFactory.controlsLayout()
+            windowManager.addView(composeView, controlsParams)
+            controlsView = composeView
+            Log.d(TAG, "Controls view attached")
             
-            val notification = buildNotification(isPlaying)
-            if (!isForeground) {
-                startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-                isForeground = true
-            } else {
-                startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-            }
-            currentOverlay = state
         } catch (e: Exception) {
-            Log.e(TAG, "Error showing overlay", e)
+            Log.e(TAG, "Error attaching overlay views", e)
+            // Clean up on failure
+            maskView = null
+            controlsView = null
         }
     }
-
-    private fun hideOverlay() {
-        if (currentOverlay == OverlayState.None && maskView == null && controlsView == null) {
+    
+    /**
+     * Update mask view layout parameters and appearance for the given overlay state.
+     * This updates the existing attached view rather than recreating it.
+     */
+    private fun updateMaskForState(state: OverlayState) {
+        val mask = maskView as? FrameLayout ?: run {
+            Log.w(TAG, "Mask view not attached, cannot update")
             return
         }
-        Log.d(TAG, "Hiding overlay")
         
-        // Cancel any previous hide animation
-        hideAnimationJob?.cancel()
+        try {
+            // Update layout parameters if state changed
+            val params = OverlayLayoutFactory.maskLayoutFor(this, state)
+            if (params != null) {
+                windowManager.updateViewLayout(mask, params)
+            }
+            
+            // Update background color based on mask alpha
+            val alpha = when (state) {
+                is OverlayState.Fullscreen -> state.maskAlpha
+                is OverlayState.Partial -> state.maskAlpha
+                OverlayState.None -> 0f
+            }
+            mask.setBackgroundColor(maskColor(alpha))
+            
+            Log.d(TAG, "Mask view updated for state: $state")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating mask for state: $state", e)
+        }
+    }
+    
+    /**
+     * Control overlay visibility by setting View.VISIBLE or View.GONE and animating alpha.
+     * NEW BEHAVIOR: Views stay attached, we just change visibility/alpha in-place.
+     * This prevents the overhead of repeated WindowManager add/remove calls.
+     */
+    private fun setOverlayVisibility(visible: Boolean, isPlaying: Boolean) {
+        Log.d(TAG, "Setting overlay visibility: visible=$visible")
         
-        // Animate fade-out, then release resources
-        hideAnimationJob = scope.launch {
-            try {
-                val mask = maskView
-                val controls = controlsView
-                
-                // Fade out both views in parallel and wait for completion
-                if (mask != null || controls != null) {
-                    val maskJob = async {
-                        mask?.let { OverlayAnimator.fadeOut(it) }
+        if (visible) {
+            // Make views visible with fade-in animation
+            maskView?.let { view ->
+                if (view.visibility != View.VISIBLE) {
+                    view.visibility = View.VISIBLE
+                    scope.launch {
+                        try {
+                            if (view.alpha < 1f) {
+                                OverlayAnimator.fadeIn(view)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error animating mask fade-in", e)
+                        }
                     }
-                    val controlsJob = async {
-                        controls?.let { OverlayAnimator.fadeOut(it) }
-                    }
-                    // Wait for both animations to actually complete
-                    maskJob.await()
-                    controlsJob.await()
                 }
-                
-                // Now release resources after animation completes
-                releaseOverlayResources()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during hide animation", e)
-                // Fall back to immediate cleanup on error
-                releaseOverlayResources()
+            }
+            
+            controlsView?.let { view ->
+                if (view.visibility != View.VISIBLE) {
+                    view.visibility = View.VISIBLE
+                    scope.launch {
+                        try {
+                            if (view.alpha < 1f) {
+                                OverlayAnimator.fadeIn(view)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error animating controls fade-in", e)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Hide views with fade-out animation, then set GONE
+            hideAnimationJob?.cancel()
+            hideAnimationJob = scope.launch {
+                try {
+                    val mask = maskView
+                    val controls = controlsView
+                    
+                    if (mask != null || controls != null) {
+                        // Fade out both views in parallel
+                        val maskJob = async {
+                            mask?.let { OverlayAnimator.fadeOut(it) }
+                        }
+                        val controlsJob = async {
+                            controls?.let { OverlayAnimator.fadeOut(it) }
+                        }
+                        maskJob.await()
+                        controlsJob.await()
+                        
+                        // Set visibility to GONE after animation completes
+                        mask?.visibility = View.GONE
+                        controls?.visibility = View.GONE
+                    }
+                    
+                    // Track that overlay is no longer visible
+                    lastVisibleState = OverlayState.None
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during hide animation", e)
+                    // Fall back to immediate hide
+                    maskView?.visibility = View.GONE
+                    controlsView?.visibility = View.GONE
+                    lastVisibleState = OverlayState.None
+                }
             }
         }
     }
@@ -363,10 +537,13 @@ class OverlayService : Service() {
     private fun releaseOverlayResources() {
         Log.d(TAG, "Releasing overlay resources")
         try {
-            // Cancel any ongoing animations
+            // Cancel any ongoing animations and debounce jobs
             hideAnimationJob?.cancel()
             hideAnimationJob = null
+            debounceJob?.cancel()
+            debounceJob = null
             
+            // Remove overlay views from WindowManager
             removeOverlays()
             tickerJob?.cancel()
             if (isForeground) {
@@ -375,6 +552,7 @@ class OverlayService : Service() {
             }
             OverlayNotification.cancel(this)
             currentOverlay = OverlayState.None
+            lastVisibleState = OverlayState.None
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing overlay resources", e)
         }
@@ -407,83 +585,6 @@ class OverlayService : Service() {
             Log.e(TAG, "Error during overlay removal", e)
         } finally {
             maskView = null
-            controlsView = null
-        }
-    }
-
-    private fun createOrUpdateMask(state: OverlayState) {
-        try {
-            val params = OverlayLayoutFactory.maskLayoutFor(this, state)
-            if (params == null) {
-                Log.w(TAG, "Cannot create mask layout for state: $state")
-                return
-            }
-            
-            val alpha = when (state) {
-                is OverlayState.Fullscreen -> state.maskAlpha
-                is OverlayState.Partial -> state.maskAlpha
-                OverlayState.None -> 0f
-            }
-            val backgroundColor = maskColor(alpha)
-            val view = maskView as? FrameLayout ?: FrameLayout(this).also { frame ->
-                frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                frame.setBackgroundColor(backgroundColor)
-                frame.alpha = 0f // Start with alpha 0 for fade-in animation
-                maskView = frame
-                windowManager.addView(frame, params)
-                Log.d(TAG, "Mask view created and added")
-                currentOverlay = state
-                return
-            }
-            view.setBackgroundColor(backgroundColor)
-            windowManager.updateViewLayout(view, params)
-            Log.d(TAG, "Mask view updated")
-            currentOverlay = state
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creating or updating mask", e)
-            // Clean up on failure to prevent inconsistent state
-            maskView = null
-        }
-    }
-
-    private fun updateMaskAlpha(state: OverlayState) {
-        val alpha = when (state) {
-            is OverlayState.Fullscreen -> state.maskAlpha
-            is OverlayState.Partial -> state.maskAlpha
-            OverlayState.None -> 0f
-        }
-        (maskView as? FrameLayout)?.setBackgroundColor(maskColor(alpha))
-    }
-
-    private fun ensureControls() {
-        if (controlsView != null) {
-            Log.d(TAG, "Controls view already exists")
-            return
-        }
-        
-        try {
-            Log.d(TAG, "Creating controls view")
-            val composeView = ComposeView(this).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                alpha = 0f // Start with alpha 0 for fade-in animation
-                setContent {
-                    AudioFocusTheme {
-                        val state by controlsState.collectAsState()
-                        ControlsOverlay(
-                            state = state,
-                            onTogglePlayPause = { commander?.togglePlayPause() },
-                            onSeekBy = { commander?.seekBy(it) },
-                            onSeekTo = { commander?.seekTo(it) }
-                        )
-                    }
-                }
-            }
-            val params = OverlayLayoutFactory.controlsLayout()
-            windowManager.addView(composeView, params)
-            controlsView = composeView
-            Log.d(TAG, "Controls view created and added")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create controls view", e)
             controlsView = null
         }
     }
