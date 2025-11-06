@@ -1,6 +1,7 @@
 package com.polaralias.audiofocus.overlay
 
 import android.content.Context
+import android.view.Gravity
 import android.view.WindowManager
 import androidx.test.core.app.ApplicationProvider
 import com.polaralias.audiofocus.model.OverlayState
@@ -30,5 +31,26 @@ class OverlayLayoutFactoryTest {
         val displayHeight = context.resources.displayMetrics.heightPixels
         val expected = (displayHeight * state.heightRatio).toInt()
         assertEquals(expected, params!!.height)
+    }
+
+    @Test
+    fun controlsLayoutIsCentered() {
+        val params = OverlayLayoutFactory.controlsLayout()
+        assertNotNull(params)
+        assertEquals(Gravity.CENTER, params.gravity)
+    }
+
+    @Test
+    fun controlsLayoutHasMatchParentWidth() {
+        val params = OverlayLayoutFactory.controlsLayout()
+        assertNotNull(params)
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params.width)
+    }
+
+    @Test
+    fun controlsLayoutHasWrapContentHeight() {
+        val params = OverlayLayoutFactory.controlsLayout()
+        assertNotNull(params)
+        assertEquals(WindowManager.LayoutParams.WRAP_CONTENT, params.height)
     }
 }

@@ -58,8 +58,7 @@ object OverlayLayoutFactory {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.BOTTOM
-            y = 48
+            gravity = Gravity.CENTER
         }
     }
 }

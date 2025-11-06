@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Surface
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -47,7 +48,7 @@ fun ControlsOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 32.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         Row(
@@ -56,40 +57,52 @@ fun ControlsOverlay(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val rewindDescription = stringResource(id = R.string.control_rewind)
-            IconButton(onClick = {
-                if (state.canSeekBy) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSeekBy(-10_000)
-                }
-            }) {
+            IconButton(
+                onClick = {
+                    if (state.canSeekBy) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSeekBy(-10_000)
+                    }
+                },
+                modifier = Modifier.size(64.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Replay10,
                     contentDescription = rewindDescription,
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(48.dp)
                 )
             }
-            IconButton(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onTogglePlayPause()
-            }) {
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onTogglePlayPause()
+                },
+                modifier = Modifier.size(72.dp)
+            ) {
                 val playDescription = stringResource(id = R.string.control_play)
                 Icon(
                     imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = playDescription,
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(56.dp)
                 )
             }
             val forwardDescription = stringResource(id = R.string.control_forward)
-            IconButton(onClick = {
-                if (state.canSeekBy) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSeekBy(10_000)
-                }
-            }) {
+            IconButton(
+                onClick = {
+                    if (state.canSeekBy) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSeekBy(10_000)
+                    }
+                },
+                modifier = Modifier.size(64.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Forward10,
                     contentDescription = forwardDescription,
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(48.dp)
                 )
             }
         }
