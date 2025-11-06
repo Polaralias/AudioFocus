@@ -231,7 +231,8 @@ class OverlayService : Service() {
             position = computePosition(playback, isPlaying),
             duration = latestDuration,
             canSeek = canSeek,
-            canSeekBy = canSeekBy
+            canSeekBy = canSeekBy,
+            isPartialOverlay = overlayState is OverlayState.Partial
         )
         restartTicker(isPlaying)
     }
