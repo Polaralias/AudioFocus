@@ -428,6 +428,7 @@ class OverlayService : Service() {
             val view = maskView as? FrameLayout ?: FrameLayout(this).also { frame ->
                 frame.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 frame.setBackgroundColor(backgroundColor)
+                frame.alpha = 0f // Start with alpha 0 for fade-in animation
                 maskView = frame
                 windowManager.addView(frame, params)
                 Log.d(TAG, "Mask view created and added")
@@ -464,6 +465,7 @@ class OverlayService : Service() {
             Log.d(TAG, "Creating controls view")
             val composeView = ComposeView(this).apply {
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                alpha = 0f // Start with alpha 0 for fade-in animation
                 setContent {
                     AudioFocusTheme {
                         val state by controlsState.collectAsState()
