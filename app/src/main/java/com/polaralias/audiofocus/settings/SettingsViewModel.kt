@@ -130,14 +130,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setDimAmount(alpha: Float) {
-        Log.d(TAG, "User adjusted dim amount: alpha=$alpha")
         viewModelScope.launch {
             try {
                 repository.setDimAmount(alpha)
-                // Don't log every successful dim change to reduce noise
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting dim amount to $alpha", e)
-                // Don't crash - just log the error
             }
         }
     }

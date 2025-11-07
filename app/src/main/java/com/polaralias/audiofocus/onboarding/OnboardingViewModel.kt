@@ -122,7 +122,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             } catch (e: Exception) {
                 Log.e(TAG, "Error completing onboarding in DataStore", e)
                 // Still mark as complete in UI to allow user to proceed
-                // The flag will be retried on next app start
+                // On next app start, we'll check permissions again to determine skip status
                 Log.w(TAG, "Proceeding with navigation despite DataStore error")
                 _uiState.update { it.copy(isOnboardingComplete = true) }
             }
