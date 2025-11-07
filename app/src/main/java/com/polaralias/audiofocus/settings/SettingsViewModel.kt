@@ -32,8 +32,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 repository.preferencesFlow
                     .catch { e ->
                         Log.e(TAG, "Error reading preferences", e)
-                        // Continue with default preferences on error
-                        // Mark loading as complete even on error
+                        // Flow already emits default preferences on error via PreferencesRepository
+                        // Mark loading as complete even on error to unblock UI
                         _uiState.update { it.copy(isLoading = false) }
                     }
                     .collectLatest { prefs ->

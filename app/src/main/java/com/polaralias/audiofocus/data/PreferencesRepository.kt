@@ -43,49 +43,33 @@ class PreferencesRepository(private val context: Context) {
             )
         }
 
-    suspend fun setEnableYouTube(enabled: Boolean) {
+    private suspend fun <T> editPreference(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         try {
-            context.dataStore.edit { it[enableYoutubeKey] = enabled }
+            context.dataStore.edit { it[key] = value }
         } catch (e: IOException) {
-            Log.e(TAG, "Error writing enableYouTube preference", e)
+            Log.e(TAG, "Error writing preference: $key", e)
             throw e
         }
+    }
+
+    suspend fun setEnableYouTube(enabled: Boolean) {
+        editPreference(enableYoutubeKey, enabled)
     }
 
     suspend fun setEnableYouTubeMusic(enabled: Boolean) {
-        try {
-            context.dataStore.edit { it[enableYoutubeMusicKey] = enabled }
-        } catch (e: IOException) {
-            Log.e(TAG, "Error writing enableYouTubeMusic preference", e)
-            throw e
-        }
+        editPreference(enableYoutubeMusicKey, enabled)
     }
 
     suspend fun setStartOnBoot(enabled: Boolean) {
-        try {
-            context.dataStore.edit { it[startOnBootKey] = enabled }
-        } catch (e: IOException) {
-            Log.e(TAG, "Error writing startOnBoot preference", e)
-            throw e
-        }
+        editPreference(startOnBootKey, enabled)
     }
 
     suspend fun setDimAmount(alpha: Float) {
-        try {
-            context.dataStore.edit { it[dimAmountKey] = alpha.coerceIn(0.2f, 1f) }
-        } catch (e: IOException) {
-            Log.e(TAG, "Error writing dimAmount preference", e)
-            throw e
-        }
+        editPreference(dimAmountKey, alpha.coerceIn(0.2f, 1f))
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
-        try {
-            context.dataStore.edit { it[onboardingCompletedKey] = completed }
-        } catch (e: IOException) {
-            Log.e(TAG, "Error writing onboardingCompleted preference", e)
-            throw e
-        }
+        editPreference(onboardingCompletedKey, completed)
     }
 
     suspend fun isOnboardingCompleted(): Boolean {
