@@ -7,5 +7,6 @@ data class SettingsUiState(
     val hasOverlayPermission: Boolean = false,
     val hasNotificationAccess: Boolean = false,
     val hasAccessibilityAccess: Boolean = false,
-    val permissionDiagnostic: String = ""
+    val permissionDiagnostic: String = "",
+    val isLoading: Boolean = true // Indicates whether initial data is still being loaded
 )

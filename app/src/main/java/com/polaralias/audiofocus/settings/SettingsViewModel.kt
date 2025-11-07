@@ -33,13 +33,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     .catch { e ->
                         Log.e(TAG, "Error reading preferences", e)
                         // Continue with default preferences on error
+                        // Mark loading as complete even on error
+                        _uiState.update { it.copy(isLoading = false) }
                     }
                     .collectLatest { prefs ->
                         Log.d(TAG, "Preferences updated: $prefs")
-                        _uiState.update { it.copy(preferences = prefs) }
+                        _uiState.update { it.copy(preferences = prefs, isLoading = false) }
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in preferences collection", e)
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
         
