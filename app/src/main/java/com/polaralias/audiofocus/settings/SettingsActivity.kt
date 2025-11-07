@@ -20,9 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.LocalContentColor
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.service.OverlayService
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
@@ -48,41 +51,62 @@ class SettingsActivity : ComponentActivity() {
         Log.d(TAG, "SettingsActivity created")
         setContent {
             AudioFocusTheme {
-                val state by viewModel.uiState.collectAsState()
-                val activity = this@SettingsActivity
-                val hasStarted = remember { mutableStateOf(false) }
-                LaunchedEffect(
-                    state.hasOverlayPermission,
-                    state.hasAccessibilityAccess,
-                    state.hasNotificationAccess
+                // Wrap entire screen in Surface with Material3 colors to ensure proper contrast
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    val ready =
-                        state.hasOverlayPermission &&
-                            state.hasAccessibilityAccess &&
+                    // Force LocalContentColor to ensure all text uses proper contrast
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                        val state by viewModel.uiState.collectAsState()
+                        val activity = this@SettingsActivity
+                        val hasStarted = remember { mutableStateOf(false) }
+                        LaunchedEffect(
+                            state.hasOverlayPermission,
+                            state.hasAccessibilityAccess,
                             state.hasNotificationAccess
-                    if (ready && !hasStarted.value) {
-                        Log.i(TAG, "All permissions granted, starting OverlayService")
-                        hasStarted.value = true
-                        OverlayService.start(activity)
-                    } else if (!ready && hasStarted.value) {
-                        Log.w(TAG, "Permissions revoked, stopping OverlayService")
-                        hasStarted.value = false
-                        OverlayService.stop(activity)
-                    } else if (!ready) {
-                        Log.w(TAG, "Cannot start service: ${state.permissionDiagnostic}")
-                        hasStarted.value = false
+                        ) {
+                            try {
+                                val ready =
+                                    state.hasOverlayPermission &&
+                                        state.hasAccessibilityAccess &&
+                                        state.hasNotificationAccess
+                                if (ready && !hasStarted.value) {
+                                    Log.i(TAG, "All permissions granted, starting OverlayService")
+                                    hasStarted.value = true
+                                    try {
+                                        OverlayService.start(activity)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error starting OverlayService", e)
+                                    }
+                                } else if (!ready && hasStarted.value) {
+                                    Log.w(TAG, "Permissions revoked, stopping OverlayService")
+                                    hasStarted.value = false
+                                    try {
+                                        OverlayService.stop(activity)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error stopping OverlayService", e)
+                                    }
+                                } else if (!ready) {
+                                    Log.w(TAG, "Cannot start service: ${state.permissionDiagnostic}")
+                                    hasStarted.value = false
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in LaunchedEffect", e)
+                            }
+                        }
+                        SettingsScreen(
+                            state = state,
+                            onToggleYouTube = viewModel::setEnableYouTube,
+                            onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
+                            onToggleStartOnBoot = viewModel::setStartOnBoot,
+                            onDimAmountChange = viewModel::setDimAmount,
+                            onRequestOverlay = { openOverlayPermission() },
+                            onRequestNotification = { openNotificationAccess() },
+                            onRequestAccessibility = { openAccessibilitySettings() }
+                        )
                     }
                 }
-                SettingsScreen(
-                    state = state,
-                    onToggleYouTube = viewModel::setEnableYouTube,
-                    onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
-                    onToggleStartOnBoot = viewModel::setStartOnBoot,
-                    onDimAmountChange = viewModel::setDimAmount,
-                    onRequestOverlay = { openOverlayPermission() },
-                    onRequestNotification = { openNotificationAccess() },
-                    onRequestAccessibility = { openAccessibilitySettings() }
-                )
             }
         }
     }
@@ -131,8 +155,16 @@ private fun SettingsScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Text(text = stringResource(id = R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
-        Text(text = stringResource(id = R.string.settings_description), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = stringResource(id = R.string.settings_title), 
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = stringResource(id = R.string.settings_description), 
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         
         // Display permission diagnostic if any permissions are missing
         if (state.permissionDiagnostic.isNotEmpty() && 
@@ -172,14 +204,22 @@ private fun SettingsScreen(
             onToggle = onToggleStartOnBoot
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = stringResource(id = R.string.dim_amount), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(id = R.string.dim_amount), 
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
             Slider(
                 value = state.preferences.dimAmount,
                 onValueChange = onDimAmountChange,
                 valueRange = 0.2f..1f,
                 steps = 7
             )
-            Text(text = String.format("%.0f%%", state.preferences.dimAmount * 100f), fontWeight = FontWeight.Medium)
+            Text(
+                text = String.format("%.0f%%", state.preferences.dimAmount * 100f), 
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
         }
         PermissionRow(
             title = stringResource(id = R.string.permission_overlay),
@@ -196,7 +236,11 @@ private fun SettingsScreen(
             granted = state.hasAccessibilityAccess,
             onClick = onRequestAccessibility
         )
-        Text(text = stringResource(id = R.string.touch_disclaimer), style = MaterialTheme.typography.bodySmall)
+        Text(
+            text = stringResource(id = R.string.touch_disclaimer), 
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         Spacer(modifier = Modifier.weight(1f, fill = true))
     }
 }
@@ -208,7 +252,11 @@ private fun ToggleRow(title: String, checked: Boolean, onToggle: (Boolean) -> Un
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = title, 
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         Switch(checked = checked, onCheckedChange = onToggle)
     }
 }
@@ -221,10 +269,15 @@ private fun PermissionRow(title: String, granted: Boolean, onClick: () -> Unit) 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = title, 
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
             Text(
                 text = if (granted) stringResource(id = R.string.permission_status_granted) else stringResource(id = R.string.permission_status_denied),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
             )
         }
         Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {

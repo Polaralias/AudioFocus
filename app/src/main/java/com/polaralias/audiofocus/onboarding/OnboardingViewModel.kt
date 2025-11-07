@@ -29,40 +29,51 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     fun checkIfShouldSkipOnboarding(callback: (Boolean) -> Unit) {
         Log.d(TAG, "Checking if should skip onboarding")
         viewModelScope.launch {
-            val isCompleted = repository.isOnboardingCompleted()
-            val context = getApplication<Application>()
-            val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
-            
-            val shouldSkip = isCompleted && permissionStatus.allPermissionsGranted
-            Log.d(TAG, "Onboarding completed: $isCompleted, All permissions: ${permissionStatus.allPermissionsGranted}, Should skip: $shouldSkip")
-            callback(shouldSkip)
+            try {
+                val isCompleted = repository.isOnboardingCompleted()
+                val context = getApplication<Application>()
+                val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+                
+                val shouldSkip = isCompleted && permissionStatus.allPermissionsGranted
+                Log.d(TAG, "Onboarding completed: $isCompleted, All permissions: ${permissionStatus.allPermissionsGranted}, Should skip: $shouldSkip")
+                callback(shouldSkip)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking if should skip onboarding", e)
+                // On error, don't skip onboarding to be safe
+                callback(false)
+            }
         }
     }
 
     fun checkPermissionsAndUpdateStep() {
         Log.d(TAG, "Checking permissions and updating step")
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
-            
-            val currentStep = when {
-                !permissionStatus.hasOverlayPermission -> OnboardingStep.OVERLAY
-                !permissionStatus.hasNotificationAccess -> OnboardingStep.NOTIFICATION
-                !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
-                else -> OnboardingStep.COMPLETE
+            try {
+                val context = getApplication<Application>()
+                val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+                
+                val currentStep = when {
+                    !permissionStatus.hasOverlayPermission -> OnboardingStep.OVERLAY
+                    !permissionStatus.hasNotificationAccess -> OnboardingStep.NOTIFICATION
+                    !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
+                    else -> OnboardingStep.COMPLETE
+                }
+                
+                _uiState.update {
+                    it.copy(
+                        currentStep = currentStep,
+                        hasOverlayPermission = permissionStatus.hasOverlayPermission,
+                        hasNotificationAccess = permissionStatus.hasNotificationAccess,
+                        hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
+                        showError = false
+                    )
+                }
+                
+                Log.d(TAG, "Current step: $currentStep, All granted: ${permissionStatus.allPermissionsGranted}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking permissions", e)
+                _uiState.update { it.copy(showError = true) }
             }
-            
-            _uiState.update {
-                it.copy(
-                    currentStep = currentStep,
-                    hasOverlayPermission = permissionStatus.hasOverlayPermission,
-                    hasNotificationAccess = permissionStatus.hasNotificationAccess,
-                    hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
-                    showError = false
-                )
-            }
-            
-            Log.d(TAG, "Current step: $currentStep, All granted: ${permissionStatus.allPermissionsGranted}")
         }
     }
 
@@ -80,8 +91,14 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     fun completeOnboarding() {
         Log.i(TAG, "Completing onboarding")
         viewModelScope.launch {
-            repository.setOnboardingCompleted(true)
-            _uiState.update { it.copy(isOnboardingComplete = true) }
+            try {
+                repository.setOnboardingCompleted(true)
+                _uiState.update { it.copy(isOnboardingComplete = true) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error completing onboarding", e)
+                // Still mark as complete in UI to allow user to proceed
+                _uiState.update { it.copy(isOnboardingComplete = true) }
+            }
         }
     }
 

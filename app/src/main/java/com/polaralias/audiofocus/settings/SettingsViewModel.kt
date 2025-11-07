@@ -9,6 +9,7 @@ import com.polaralias.audiofocus.util.PermissionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,51 +25,99 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         Log.d(TAG, "SettingsViewModel initialized")
+        
+        // Asynchronously collect preferences without blocking
         viewModelScope.launch {
-            repository.preferencesFlow.collectLatest { prefs ->
-                _uiState.update { it.copy(preferences = prefs) }
+            try {
+                repository.preferencesFlow
+                    .catch { e ->
+                        Log.e(TAG, "Error reading preferences", e)
+                        // Continue with default preferences on error
+                    }
+                    .collectLatest { prefs ->
+                        Log.d(TAG, "Preferences updated: $prefs")
+                        _uiState.update { it.copy(preferences = prefs) }
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in preferences collection", e)
             }
         }
+        
+        // Refresh permissions asynchronously
         refreshPermissions()
     }
 
     fun refreshPermissions() {
         Log.d(TAG, "Refreshing permissions")
-        val context = getApplication<Application>()
-        val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
-        
-        _uiState.update {
-            it.copy(
-                hasOverlayPermission = permissionStatus.hasOverlayPermission,
-                hasNotificationAccess = permissionStatus.hasNotificationAccess,
-                hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
-                permissionDiagnostic = permissionStatus.getDiagnosticMessage()
-            )
-        }
-        
-        if (!permissionStatus.allPermissionsGranted) {
-            Log.w(TAG, "Missing permissions: ${permissionStatus.getDiagnosticMessage()}")
-        } else {
-            Log.i(TAG, "All permissions granted")
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
+                val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+                
+                _uiState.update {
+                    it.copy(
+                        hasOverlayPermission = permissionStatus.hasOverlayPermission,
+                        hasNotificationAccess = permissionStatus.hasNotificationAccess,
+                        hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
+                        permissionDiagnostic = permissionStatus.getDiagnosticMessage()
+                    )
+                }
+                
+                if (!permissionStatus.allPermissionsGranted) {
+                    Log.w(TAG, "Missing permissions: ${permissionStatus.getDiagnosticMessage()}")
+                } else {
+                    Log.i(TAG, "All permissions granted")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing permissions", e)
+                // Update with error diagnostic
+                _uiState.update {
+                    it.copy(permissionDiagnostic = "Error checking permissions: ${e.message}")
+                }
+            }
         }
     }
 
     fun setEnableYouTube(enabled: Boolean) {
         Log.d(TAG, "Setting YouTube enabled: $enabled")
-        viewModelScope.launch { repository.setEnableYouTube(enabled) }
+        viewModelScope.launch {
+            try {
+                repository.setEnableYouTube(enabled)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting YouTube enabled", e)
+            }
+        }
     }
 
     fun setEnableYouTubeMusic(enabled: Boolean) {
         Log.d(TAG, "Setting YouTube Music enabled: $enabled")
-        viewModelScope.launch { repository.setEnableYouTubeMusic(enabled) }
+        viewModelScope.launch {
+            try {
+                repository.setEnableYouTubeMusic(enabled)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting YouTube Music enabled", e)
+            }
+        }
     }
 
     fun setStartOnBoot(enabled: Boolean) {
         Log.d(TAG, "Setting start on boot: $enabled")
-        viewModelScope.launch { repository.setStartOnBoot(enabled) }
+        viewModelScope.launch {
+            try {
+                repository.setStartOnBoot(enabled)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting start on boot", e)
+            }
+        }
     }
 
     fun setDimAmount(alpha: Float) {
-        viewModelScope.launch { repository.setDimAmount(alpha) }
+        viewModelScope.launch {
+            try {
+                repository.setDimAmount(alpha)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting dim amount", e)
+            }
+        }
     }
 }
