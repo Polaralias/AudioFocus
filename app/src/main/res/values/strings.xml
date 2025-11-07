@@ -68,4 +68,7 @@
     <string name="onboarding_error_title">Permission Required</string>
     <string name="onboarding_error_message">AudioFocus requires all permissions to function. Please grant the permission to continue.</string>
     <string name="onboarding_retry">Retry</string>
+    
+    <!-- Settings loading -->
+    <string name="settings_loading">Loading settings…</string>
 </resources>

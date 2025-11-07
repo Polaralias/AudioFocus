@@ -41,77 +41,120 @@ class OnboardingActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "OnboardingActivity created")
+        Log.i(TAG, "OnboardingActivity onCreate - starting initialization")
         
-        // Check if we should skip onboarding
-        checkIfShouldSkipOnboarding()
-        
-        setContent {
-            AudioFocusTheme {
-                val state by viewModel.uiState.collectAsState()
-                
-                LaunchedEffect(state.isOnboardingComplete) {
-                    if (state.isOnboardingComplete) {
-                        Log.i(TAG, "Onboarding complete, navigating to SettingsActivity")
-                        try {
-                            startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
-                            finish()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error navigating to SettingsActivity", e)
+        try {
+            // Check if we should skip onboarding
+            checkIfShouldSkipOnboarding()
+            
+            setContent {
+                AudioFocusTheme {
+                    val state by viewModel.uiState.collectAsState()
+                    
+                    LaunchedEffect(state.isOnboardingComplete) {
+                        if (state.isOnboardingComplete) {
+                            Log.i(TAG, "Onboarding complete, navigating to SettingsActivity")
+                            try {
+                                val intent = Intent(this@OnboardingActivity, SettingsActivity::class.java)
+                                startActivity(intent)
+                                Log.d(TAG, "SettingsActivity started successfully")
+                                finish()
+                                Log.d(TAG, "OnboardingActivity finished")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error navigating to SettingsActivity", e)
+                                // Don't crash - log the error and let user retry
+                            }
                         }
                     }
+                    
+                    OnboardingScreen(
+                        state = state,
+                        onRequestOverlay = { openOverlayPermission() },
+                        onRequestNotification = { openNotificationAccess() },
+                        onRequestAccessibility = { openAccessibilitySettings() },
+                        onComplete = { viewModel.completeOnboarding() },
+                        onContinue = { viewModel.startWelcome() },
+                        onRetry = { viewModel.checkPermissionsAndUpdateStep() }
+                    )
                 }
-                
-                OnboardingScreen(
-                    state = state,
-                    onRequestOverlay = { openOverlayPermission() },
-                    onRequestNotification = { openNotificationAccess() },
-                    onRequestAccessibility = { openAccessibilitySettings() },
-                    onComplete = { viewModel.completeOnboarding() },
-                    onContinue = { viewModel.startWelcome() },
-                    onRetry = { viewModel.checkPermissionsAndUpdateStep() }
-                )
             }
+            Log.d(TAG, "OnboardingActivity content set successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during OnboardingActivity onCreate", e)
+            // Don't crash - the Compose content should still render with default state
         }
     }
 
     private fun checkIfShouldSkipOnboarding() {
-        viewModel.checkIfShouldSkipOnboarding { shouldSkip ->
-            if (shouldSkip) {
-                Log.i(TAG, "Skipping onboarding, all permissions granted")
-                try {
-                    startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
-                    finish()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error navigating to SettingsActivity during skip", e)
+        Log.d(TAG, "Initiating onboarding skip check")
+        try {
+            viewModel.checkIfShouldSkipOnboarding { shouldSkip ->
+                Log.i(TAG, "Onboarding skip check callback: shouldSkip=$shouldSkip")
+                if (shouldSkip) {
+                    Log.i(TAG, "Skipping onboarding, navigating to SettingsActivity")
+                    try {
+                        val intent = Intent(this@OnboardingActivity, SettingsActivity::class.java)
+                        startActivity(intent)
+                        Log.d(TAG, "SettingsActivity started successfully from skip")
+                        finish()
+                        Log.d(TAG, "OnboardingActivity finished after skip")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error navigating to SettingsActivity during skip", e)
+                        // Don't crash - log error and let user go through onboarding flow
+                    }
+                } else {
+                    Log.d(TAG, "Not skipping onboarding - user will go through flow")
                 }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during skip check initiation", e)
+            // Continue with normal onboarding flow on error
         }
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "OnboardingActivity resumed, checking permissions")
-        viewModel.checkPermissionsAndUpdateStep()
+        Log.i(TAG, "OnboardingActivity onResume - refreshing permissions")
+        try {
+            viewModel.checkPermissionsAndUpdateStep()
+            Log.d(TAG, "Permission check initiated successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onResume permission check", e)
+        }
     }
 
     private fun openOverlayPermission() {
-        Log.d(TAG, "Opening overlay permission settings")
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName")
-        )
-        startActivity(intent)
+        Log.i(TAG, "Opening overlay permission settings")
+        try {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+            Log.d(TAG, "Overlay permission settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening overlay permission settings", e)
+        }
     }
 
     private fun openNotificationAccess() {
-        Log.d(TAG, "Opening notification access settings")
-        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        Log.i(TAG, "Opening notification access settings")
+        try {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            Log.d(TAG, "Notification access settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening notification access settings", e)
+        }
     }
 
     private fun openAccessibilitySettings() {
-        Log.d(TAG, "Opening accessibility settings")
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        Log.i(TAG, "Opening accessibility settings")
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            Log.d(TAG, "Accessibility settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening accessibility settings", e)
+        }
     }
 }
 

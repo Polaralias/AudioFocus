@@ -24,38 +24,45 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        Log.d(TAG, "SettingsViewModel initialized")
+        Log.i(TAG, "SettingsViewModel initialized - starting async data loading")
         
         // Asynchronously collect preferences without blocking
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Starting preferences collection from DataStore")
                 repository.preferencesFlow
                     .catch { e ->
-                        Log.e(TAG, "Error reading preferences", e)
+                        Log.e(TAG, "Error reading preferences from DataStore", e)
                         // Flow already emits default preferences on error via PreferencesRepository
                         // Mark loading as complete even on error to unblock UI
                         _uiState.update { it.copy(isLoading = false) }
                     }
                     .collectLatest { prefs ->
-                        Log.d(TAG, "Preferences updated: $prefs")
+                        Log.d(TAG, "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}, dimAmount=${prefs.dimAmount}")
                         _uiState.update { it.copy(preferences = prefs, isLoading = false) }
+                        Log.d(TAG, "UI state updated with preferences, isLoading=false")
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in preferences collection", e)
+                Log.e(TAG, "Fatal error in preferences collection", e)
+                // Update state with defaults and mark as not loading to keep UI responsive
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
         
         // Refresh permissions asynchronously
+        Log.d(TAG, "Initiating initial permission refresh")
         refreshPermissions()
     }
 
     fun refreshPermissions() {
-        Log.d(TAG, "Refreshing permissions")
+        Log.i(TAG, "Refreshing permissions - starting async check")
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>()
+                Log.d(TAG, "Checking permissions via PermissionValidator")
                 val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+                
+                Log.i(TAG, "Permission check completed: ${permissionStatus.getDiagnosticMessage()}")
                 
                 _uiState.update {
                     it.copy(
@@ -67,13 +74,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
                 
                 if (!permissionStatus.allPermissionsGranted) {
-                    Log.w(TAG, "Missing permissions: ${permissionStatus.getDiagnosticMessage()}")
+                    Log.w(TAG, "Missing permissions detected: ${permissionStatus.getDiagnosticMessage()}")
                 } else {
                     Log.i(TAG, "All permissions granted")
                 }
+                
+                Log.d(TAG, "UI state updated with permission status")
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing permissions", e)
-                // Update with error diagnostic
+                // Update with error diagnostic but keep UI responsive
                 _uiState.update {
                     it.copy(permissionDiagnostic = "Error checking permissions: ${e.message}")
                 }
@@ -82,34 +91,40 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setEnableYouTube(enabled: Boolean) {
-        Log.d(TAG, "Setting YouTube enabled: $enabled")
+        Log.i(TAG, "User toggled YouTube: enabled=$enabled")
         viewModelScope.launch {
             try {
                 repository.setEnableYouTube(enabled)
+                Log.d(TAG, "YouTube setting saved successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting YouTube enabled", e)
+                Log.e(TAG, "Error setting YouTube enabled to $enabled", e)
+                // Don't crash - just log the error
             }
         }
     }
 
     fun setEnableYouTubeMusic(enabled: Boolean) {
-        Log.d(TAG, "Setting YouTube Music enabled: $enabled")
+        Log.i(TAG, "User toggled YouTube Music: enabled=$enabled")
         viewModelScope.launch {
             try {
                 repository.setEnableYouTubeMusic(enabled)
+                Log.d(TAG, "YouTube Music setting saved successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting YouTube Music enabled", e)
+                Log.e(TAG, "Error setting YouTube Music enabled to $enabled", e)
+                // Don't crash - just log the error
             }
         }
     }
 
     fun setStartOnBoot(enabled: Boolean) {
-        Log.d(TAG, "Setting start on boot: $enabled")
+        Log.i(TAG, "User toggled start on boot: enabled=$enabled")
         viewModelScope.launch {
             try {
                 repository.setStartOnBoot(enabled)
+                Log.d(TAG, "Start on boot setting saved successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting start on boot", e)
+                Log.e(TAG, "Error setting start on boot to $enabled", e)
+                // Don't crash - just log the error
             }
         }
     }
@@ -119,7 +134,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             try {
                 repository.setDimAmount(alpha)
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting dim amount", e)
+                Log.e(TAG, "Error setting dim amount to $alpha", e)
             }
         }
     }

@@ -103,66 +103,85 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "OverlayService onCreate")
-        
-        // Validate permissions before initializing
-        val permissionStatus = PermissionValidator.checkPermissions(applicationContext, TAG)
-        if (!permissionStatus.allPermissionsGranted) {
-            Log.e(TAG, "Service started without required permissions: ${permissionStatus.getDiagnosticMessage()}")
-            Log.e(TAG, "Stopping service immediately to prevent crashes")
-            stopSelf()
-            return
-        }
+        Log.i(TAG, "OverlayService onCreate - starting initialization")
         
         try {
+            // Validate permissions before initializing
+            Log.d(TAG, "Checking permissions before service initialization")
+            val permissionStatus = PermissionValidator.checkPermissions(applicationContext, TAG)
+            if (!permissionStatus.allPermissionsGranted) {
+                Log.e(TAG, "Service started without required permissions: ${permissionStatus.getDiagnosticMessage()}")
+                Log.e(TAG, "Stopping service immediately to prevent crashes")
+                stopSelf()
+                return
+            }
+            Log.i(TAG, "All permissions verified - proceeding with service initialization")
+            
             windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             preferences = PreferencesRepository(applicationContext)
             mediaMonitor = MediaSessionMonitor(this, scope)
+            
+            Log.d(TAG, "Building foreground notification")
             val notification = buildNotification(isPlaying = false)
             startForeground(OverlayNotification.NOTIFICATION_ID, notification)
             isForeground = true
+            Log.i(TAG, "Service started in foreground successfully")
             
             // NEW BEHAVIOR: Attach overlay views immediately when service starts
             // This keeps views present (like AudioFocus_old), we'll control visibility via alpha/visibility
             // Views stay attached as long as overlay permission is granted and service is running
+            Log.d(TAG, "Attaching overlay views to WindowManager")
             attachOverlayViews()
             
+            Log.d(TAG, "Starting data collectors")
             startCollectors()
             Log.i(TAG, "OverlayService initialized successfully with overlay views attached")
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing OverlayService", e)
+            Log.e(TAG, "Fatal error initializing OverlayService", e)
             stopSelf()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand: action=${intent?.action}")
+        Log.i(TAG, "onStartCommand: action=${intent?.action}")
         
-        when (intent?.action) {
-            ACTION_TOGGLE_PLAYBACK -> {
-                Log.d(TAG, "Toggle playback requested")
-                commander?.togglePlayPause()
+        try {
+            when (intent?.action) {
+                ACTION_TOGGLE_PLAYBACK -> {
+                    Log.d(TAG, "Toggle playback requested")
+                    try {
+                        commander?.togglePlayPause()
+                        Log.d(TAG, "Toggle playback command sent")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error toggling playback", e)
+                    }
+                }
+                ACTION_STOP -> {
+                    Log.i(TAG, "Stop action received")
+                    stopFromRequest()
+                    return START_NOT_STICKY
+                }
             }
-            ACTION_STOP -> {
-                Log.i(TAG, "Stop action received")
-                stopFromRequest()
-                return START_NOT_STICKY
-            }
+            startCollectors()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onStartCommand", e)
         }
-        startCollectors()
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        Log.i(TAG, "OverlayService onDestroy")
+        Log.i(TAG, "OverlayService onDestroy - starting cleanup")
         super.onDestroy()
         try {
+            Log.d(TAG, "Removing overlay views")
             removeOverlays()
+            Log.d(TAG, "Stopping media monitor")
             mediaMonitor.stop()
+            Log.d(TAG, "Cancelling coroutine scope")
             scope.cancel()
-            Log.d(TAG, "OverlayService cleanup completed")
+            Log.i(TAG, "OverlayService cleanup completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during service cleanup", e)
         }
@@ -174,46 +193,54 @@ class OverlayService : Service() {
             return
         }
         collectorsStarted = true
-        Log.d(TAG, "Starting collectors")
+        Log.i(TAG, "Starting data collectors")
         
-        val component = ComponentName(this, MediaNotificationListener::class.java)
-        mediaMonitor.start(component)
-        scope.launch {
-            try {
-                combine(
-                    mediaMonitor.state,
-                    AccessWindowsService.windowInfo,
-                    preferences.preferencesFlow.catch { e ->
-                        Log.e(TAG, "Error reading preferences in collector, using defaults", e)
-                        emit(com.polaralias.audiofocus.data.OverlayPreferences())
-                    }
-                ) { media, windowInfo, prefs ->
-                    val playback = when (media) {
-                        is MediaState.Playing -> media.playbackState
-                        is MediaState.Paused -> media.playbackState
-                        MediaState.Idle -> null
-                    }
-                    val metadata = when (media) {
-                        is MediaState.Playing -> media.metadata
-                        is MediaState.Paused -> media.metadata
-                        MediaState.Idle -> null
-                    }
-                    val overlay = PolicyEngine.compute(
-                        PolicyInput(
-                            packageName = media.controllerPackage(),
-                            playbackState = playback,
-                            metadata = metadata,
-                            windowInfo = if (windowInfo == WindowInfo.Empty) WindowInfo.Empty else windowInfo,
-                            preferences = prefs
+        try {
+            val component = ComponentName(this, MediaNotificationListener::class.java)
+            mediaMonitor.start(component)
+            Log.d(TAG, "Media monitor started")
+            
+            scope.launch {
+                try {
+                    Log.d(TAG, "Starting combined flow collection")
+                    combine(
+                        mediaMonitor.state,
+                        AccessWindowsService.windowInfo,
+                        preferences.preferencesFlow.catch { e ->
+                            Log.e(TAG, "Error reading preferences in collector, using defaults", e)
+                            emit(com.polaralias.audiofocus.data.OverlayPreferences())
+                        }
+                    ) { media, windowInfo, prefs ->
+                        val playback = when (media) {
+                            is MediaState.Playing -> media.playbackState
+                            is MediaState.Paused -> media.playbackState
+                            MediaState.Idle -> null
+                        }
+                        val metadata = when (media) {
+                            is MediaState.Playing -> media.metadata
+                            is MediaState.Paused -> media.metadata
+                            MediaState.Idle -> null
+                        }
+                        val overlay = PolicyEngine.compute(
+                            PolicyInput(
+                                packageName = media.controllerPackage(),
+                                playbackState = playback,
+                                metadata = metadata,
+                                windowInfo = if (windowInfo == WindowInfo.Empty) WindowInfo.Empty else windowInfo,
+                                preferences = prefs
+                            )
                         )
-                    )
-                    OverlayRenderState(media, overlay)
-                }.collectLatest { renderState ->
-                    applyRenderState(renderState)
+                        OverlayRenderState(media, overlay)
+                    }.collectLatest { renderState ->
+                        applyRenderState(renderState)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in data collectors flow", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error in collectors", e)
             }
+            Log.i(TAG, "Data collectors started successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting collectors", e)
         }
     }
 
@@ -376,7 +403,7 @@ class OverlayService : Service() {
      */
     private fun attachOverlayViews() {
         try {
-            Log.d(TAG, "Attaching overlay views to WindowManager")
+            Log.i(TAG, "Attaching overlay views to WindowManager")
             
             // Create and attach mask view (initially hidden)
             val maskFrame = FrameLayout(this).apply {
@@ -387,39 +414,57 @@ class OverlayService : Service() {
                 visibility = View.GONE // Start hidden
                 alpha = 0f
             }
+            
             // Use Fullscreen state for initial layout params (will be updated later based on actual state)
             // Fullscreen params work for all states as they cover the entire screen
-            val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen())
-            if (maskParams != null) {
-                windowManager.addView(maskFrame, maskParams)
-                maskView = maskFrame
-                Log.d(TAG, "Mask view attached")
+            try {
+                Log.d(TAG, "Creating mask layout parameters")
+                val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen())
+                if (maskParams != null) {
+                    Log.d(TAG, "Adding mask view to WindowManager")
+                    windowManager.addView(maskFrame, maskParams)
+                    maskView = maskFrame
+                    Log.i(TAG, "Mask view attached successfully")
+                } else {
+                    Log.e(TAG, "Failed to create mask layout parameters - maskParams is null")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error attaching mask view to WindowManager", e)
             }
             
             // Create and attach controls view (initially hidden)
-            val composeView = ComposeView(this).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                visibility = View.GONE // Start hidden
-                alpha = 0f
-                setContent {
-                    AudioFocusTheme {
-                        val state by controlsState.collectAsState()
-                        ControlsOverlay(
-                            state = state,
-                            onTogglePlayPause = { commander?.togglePlayPause() },
-                            onSeekBy = { commander?.seekBy(it) },
-                            onSeekTo = { commander?.seekTo(it) }
-                        )
+            try {
+                Log.d(TAG, "Creating controls ComposeView")
+                val composeView = ComposeView(this).apply {
+                    setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                    visibility = View.GONE // Start hidden
+                    alpha = 0f
+                    setContent {
+                        AudioFocusTheme {
+                            val state by controlsState.collectAsState()
+                            ControlsOverlay(
+                                state = state,
+                                onTogglePlayPause = { commander?.togglePlayPause() },
+                                onSeekBy = { commander?.seekBy(it) },
+                                onSeekTo = { commander?.seekTo(it) }
+                            )
+                        }
                     }
                 }
+                
+                Log.d(TAG, "Creating controls layout parameters")
+                val controlsParams = OverlayLayoutFactory.controlsLayout()
+                Log.d(TAG, "Adding controls view to WindowManager")
+                windowManager.addView(composeView, controlsParams)
+                controlsView = composeView
+                Log.i(TAG, "Controls view attached successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error attaching controls view to WindowManager", e)
             }
-            val controlsParams = OverlayLayoutFactory.controlsLayout()
-            windowManager.addView(composeView, controlsParams)
-            controlsView = composeView
-            Log.d(TAG, "Controls view attached")
             
+            Log.i(TAG, "Overlay views attachment completed - maskView=${maskView != null}, controlsView=${controlsView != null}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error attaching overlay views", e)
+            Log.e(TAG, "Fatal error attaching overlay views", e)
             // Clean up on failure
             maskView = null
             controlsView = null
@@ -437,21 +482,35 @@ class OverlayService : Service() {
         }
         
         try {
+            Log.d(TAG, "Updating mask for state: $state")
+            
             // Update layout parameters if state changed
-            val params = OverlayLayoutFactory.maskLayoutFor(this, state)
-            if (params != null) {
-                windowManager.updateViewLayout(mask, params)
+            try {
+                val params = OverlayLayoutFactory.maskLayoutFor(this, state)
+                if (params != null) {
+                    windowManager.updateViewLayout(mask, params)
+                    Log.d(TAG, "Mask layout parameters updated successfully")
+                } else {
+                    Log.w(TAG, "Failed to get layout parameters for state: $state")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating mask layout parameters", e)
             }
             
             // Update background color based on mask alpha
-            val alpha = when (state) {
-                is OverlayState.Fullscreen -> state.maskAlpha
-                is OverlayState.Partial -> state.maskAlpha
-                OverlayState.None -> 0f
+            try {
+                val alpha = when (state) {
+                    is OverlayState.Fullscreen -> state.maskAlpha
+                    is OverlayState.Partial -> state.maskAlpha
+                    OverlayState.None -> 0f
+                }
+                mask.setBackgroundColor(maskColor(alpha))
+                Log.d(TAG, "Mask background color updated with alpha: $alpha")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating mask background color", e)
             }
-            mask.setBackgroundColor(maskColor(alpha))
             
-            Log.d(TAG, "Mask view updated for state: $state")
+            Log.d(TAG, "Mask view updated successfully for state: $state")
         } catch (e: Exception) {
             Log.e(TAG, "Error updating mask for state: $state", e)
         }
@@ -463,117 +522,180 @@ class OverlayService : Service() {
      * This prevents the overhead of repeated WindowManager add/remove calls.
      */
     private fun setOverlayVisibility(visible: Boolean, isPlaying: Boolean) {
-        Log.d(TAG, "Setting overlay visibility: visible=$visible")
+        Log.i(TAG, "Setting overlay visibility: visible=$visible, isPlaying=$isPlaying")
         
-        if (visible) {
-            // Make views visible with fade-in animation
-            // Note: OverlayAnimator.fadeIn handles setting visibility internally
-            maskView?.let { view ->
-                if (view.visibility != View.VISIBLE || view.alpha < 1f) {
-                    scope.launch {
+        try {
+            if (visible) {
+                // Make views visible with fade-in animation
+                // Note: OverlayAnimator.fadeIn handles setting visibility internally
+                maskView?.let { view ->
+                    if (view.visibility != View.VISIBLE || view.alpha < 1f) {
+                        scope.launch {
+                            try {
+                                Log.d(TAG, "Fading in mask view")
+                                OverlayAnimator.fadeIn(view)
+                                Log.d(TAG, "Mask view fade-in completed")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error animating mask fade-in", e)
+                            }
+                        }
+                    }
+                }
+                
+                controlsView?.let { view ->
+                    if (view.visibility != View.VISIBLE || view.alpha < 1f) {
+                        scope.launch {
+                            try {
+                                Log.d(TAG, "Fading in controls view")
+                                OverlayAnimator.fadeIn(view)
+                                Log.d(TAG, "Controls view fade-in completed")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error animating controls fade-in", e)
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Hide views with fade-out animation, then set GONE
+                // Note: OverlayAnimator.fadeOut handles setting visibility to GONE internally
+                hideAnimationJob?.cancel()
+                hideAnimationJob = scope.launch {
+                    try {
+                        val mask = maskView
+                        val controls = controlsView
+                        
+                        if (mask != null || controls != null) {
+                            Log.d(TAG, "Starting fade-out animation for overlay views")
+                            // Fade out both views in parallel
+                            val maskJob = async {
+                                mask?.let { 
+                                    Log.d(TAG, "Fading out mask view")
+                                    OverlayAnimator.fadeOut(it) 
+                                }
+                            }
+                            val controlsJob = async {
+                                controls?.let { 
+                                    Log.d(TAG, "Fading out controls view")
+                                    OverlayAnimator.fadeOut(it) 
+                                }
+                            }
+                            maskJob.await()
+                            controlsJob.await()
+                            Log.d(TAG, "Fade-out animation completed")
+                        }
+                        
+                        // Track that overlay is no longer visible
+                        lastVisibleState = OverlayState.None
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error during hide animation", e)
+                        // Fall back to immediate hide on error
                         try {
-                            OverlayAnimator.fadeIn(view)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error animating mask fade-in", e)
+                            maskView?.let { OverlayAnimator.hideImmediate(it) }
+                            controlsView?.let { OverlayAnimator.hideImmediate(it) }
+                            lastVisibleState = OverlayState.None
+                        } catch (e2: Exception) {
+                            Log.e(TAG, "Error during immediate hide fallback", e2)
                         }
                     }
                 }
             }
-            
-            controlsView?.let { view ->
-                if (view.visibility != View.VISIBLE || view.alpha < 1f) {
-                    scope.launch {
-                        try {
-                            OverlayAnimator.fadeIn(view)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error animating controls fade-in", e)
-                        }
-                    }
-                }
-            }
-        } else {
-            // Hide views with fade-out animation, then set GONE
-            // Note: OverlayAnimator.fadeOut handles setting visibility to GONE internally
-            hideAnimationJob?.cancel()
-            hideAnimationJob = scope.launch {
-                try {
-                    val mask = maskView
-                    val controls = controlsView
-                    
-                    if (mask != null || controls != null) {
-                        // Fade out both views in parallel
-                        val maskJob = async {
-                            mask?.let { OverlayAnimator.fadeOut(it) }
-                        }
-                        val controlsJob = async {
-                            controls?.let { OverlayAnimator.fadeOut(it) }
-                        }
-                        maskJob.await()
-                        controlsJob.await()
-                    }
-                    
-                    // Track that overlay is no longer visible
-                    lastVisibleState = OverlayState.None
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error during hide animation", e)
-                    // Fall back to immediate hide on error
-                    maskView?.let { OverlayAnimator.hideImmediate(it) }
-                    controlsView?.let { OverlayAnimator.hideImmediate(it) }
-                    lastVisibleState = OverlayState.None
-                }
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting overlay visibility", e)
         }
     }
 
     private fun stopFromRequest() {
-        Log.i(TAG, "Stopping from request")
-        releaseOverlayResources()
-        stopSelf()
+        Log.i(TAG, "Stopping service from request")
+        try {
+            releaseOverlayResources()
+            stopSelf()
+            Log.d(TAG, "Service stop completed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during service stop", e)
+            // Still try to stop self even on error
+            try {
+                stopSelf()
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error calling stopSelf", e2)
+            }
+        }
     }
 
     private fun releaseOverlayResources() {
-        Log.d(TAG, "Releasing overlay resources")
+        Log.i(TAG, "Releasing overlay resources")
         try {
             // Cancel any ongoing animations and debounce jobs
-            hideAnimationJob?.cancel()
-            hideAnimationJob = null
-            debounceJob?.cancel()
-            debounceJob = null
+            Log.d(TAG, "Cancelling pending jobs")
+            try {
+                hideAnimationJob?.cancel()
+                hideAnimationJob = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling hide animation job", e)
+            }
+            
+            try {
+                debounceJob?.cancel()
+                debounceJob = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling debounce job", e)
+            }
             
             // Remove overlay views from WindowManager
+            Log.d(TAG, "Removing overlay views")
             removeOverlays()
-            tickerJob?.cancel()
-            if (isForeground) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                isForeground = false
+            
+            try {
+                tickerJob?.cancel()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling ticker job", e)
             }
-            OverlayNotification.cancel(this)
+            
+            if (isForeground) {
+                try {
+                    Log.d(TAG, "Stopping foreground service")
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    isForeground = false
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error stopping foreground", e)
+                }
+            }
+            
+            try {
+                OverlayNotification.cancel(this)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling notification", e)
+            }
+            
             currentOverlay = OverlayState.None
             lastVisibleState = OverlayState.None
+            Log.i(TAG, "Overlay resources released successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing overlay resources", e)
         }
     }
 
     private fun removeOverlays() {
-        Log.d(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
+        Log.i(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
         try {
             maskView?.let { 
                 runCatching {
+                    Log.d(TAG, "Removing mask view from WindowManager")
                     // Ensure animations are cancelled before removal
                     OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it) 
-                    Log.d(TAG, "Mask view removed")
+                    Log.i(TAG, "Mask view removed successfully")
                 }.onFailure { e ->
                     Log.e(TAG, "Error removing mask view", e)
                 }
             }
+            
             controlsView?.let { 
                 runCatching {
+                    Log.d(TAG, "Removing controls view from WindowManager")
                     // Ensure animations are cancelled before removal
                     OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it)
-                    Log.d(TAG, "Controls view removed")
+                    Log.i(TAG, "Controls view removed successfully")
                 }.onFailure { e ->
                     Log.e(TAG, "Error removing controls view", e)
                 }
@@ -583,6 +705,7 @@ class OverlayService : Service() {
         } finally {
             maskView = null
             controlsView = null
+            Log.d(TAG, "Overlay view references cleared")
         }
     }
 

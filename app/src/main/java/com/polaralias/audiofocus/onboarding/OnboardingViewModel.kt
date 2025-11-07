@@ -23,33 +23,50 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         Log.d(TAG, "OnboardingViewModel initialized")
-        checkPermissionsAndUpdateStep()
+        try {
+            checkPermissionsAndUpdateStep()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during ViewModel initialization", e)
+            _uiState.update { it.copy(showError = true) }
+        }
     }
 
+    /**
+     * Check if onboarding should be skipped asynchronously.
+     * Returns a StateFlow that emits the skip decision.
+     * This prevents blocking the UI thread during the check.
+     */
     fun checkIfShouldSkipOnboarding(callback: (Boolean) -> Unit) {
-        Log.d(TAG, "Checking if should skip onboarding")
+        Log.d(TAG, "Checking if should skip onboarding - async operation started")
         viewModelScope.launch {
             try {
+                // Defensive: Run all checks in background to avoid blocking
                 val isCompleted = repository.isOnboardingCompleted()
+                Log.d(TAG, "Onboarding completed status: $isCompleted")
+                
                 val context = getApplication<Application>()
                 val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
+                Log.d(TAG, "Permission check completed: ${permissionStatus.getDiagnosticMessage()}")
                 
                 val shouldSkip = isCompleted && permissionStatus.allPermissionsGranted
-                Log.d(TAG, "Onboarding completed: $isCompleted, All permissions: ${permissionStatus.allPermissionsGranted}, Should skip: $shouldSkip")
+                Log.i(TAG, "Skip onboarding decision: $shouldSkip (completed=$isCompleted, allPermissions=${permissionStatus.allPermissionsGranted})")
+                
                 callback(shouldSkip)
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking if should skip onboarding", e)
-                // On error, don't skip onboarding to be safe
+                // On error, don't skip onboarding to be safe - user can still proceed through flow
+                Log.w(TAG, "Defaulting to NOT skipping onboarding due to error")
                 callback(false)
             }
         }
     }
 
     fun checkPermissionsAndUpdateStep() {
-        Log.d(TAG, "Checking permissions and updating step")
+        Log.d(TAG, "Checking permissions and updating step - starting async operation")
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>()
+                Log.d(TAG, "Performing permission check...")
                 val permissionStatus = PermissionValidator.checkPermissions(context, TAG)
                 
                 val currentStep = when {
@@ -58,6 +75,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
                     else -> OnboardingStep.COMPLETE
                 }
+                
+                Log.i(TAG, "Permission check result - Step: $currentStep, Status: ${permissionStatus.getDiagnosticMessage()}")
                 
                 _uiState.update {
                     it.copy(
@@ -69,9 +88,10 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     )
                 }
                 
-                Log.d(TAG, "Current step: $currentStep, All granted: ${permissionStatus.allPermissionsGranted}")
+                Log.d(TAG, "UI state updated successfully with step: $currentStep")
             } catch (e: Exception) {
-                Log.e(TAG, "Error checking permissions", e)
+                Log.e(TAG, "Error checking permissions and updating step", e)
+                // Update UI to show error but keep it responsive
                 _uiState.update { it.copy(showError = true) }
             }
         }
@@ -89,22 +109,34 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun completeOnboarding() {
-        Log.i(TAG, "Completing onboarding")
+        Log.i(TAG, "Completing onboarding - starting async operation")
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Setting onboarding completed flag in DataStore...")
                 repository.setOnboardingCompleted(true)
+                Log.i(TAG, "Onboarding completed flag set successfully")
+                
+                // Update UI state to trigger navigation
                 _uiState.update { it.copy(isOnboardingComplete = true) }
+                Log.d(TAG, "UI state updated - isOnboardingComplete=true")
             } catch (e: Exception) {
-                Log.e(TAG, "Error completing onboarding", e)
+                Log.e(TAG, "Error completing onboarding in DataStore", e)
                 // Still mark as complete in UI to allow user to proceed
+                // On next app start, we'll check permissions again to determine skip status
+                Log.w(TAG, "Proceeding with navigation despite DataStore error")
                 _uiState.update { it.copy(isOnboardingComplete = true) }
             }
         }
     }
 
     fun startWelcome() {
-        Log.d(TAG, "Starting from welcome screen")
-        _uiState.update { it.copy(currentStep = OnboardingStep.OVERLAY) }
+        Log.i(TAG, "User continuing from welcome screen")
+        try {
+            _uiState.update { it.copy(currentStep = OnboardingStep.OVERLAY) }
+            Log.d(TAG, "UI state updated - moved to OVERLAY step")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating state from welcome", e)
+        }
     }
 }
 

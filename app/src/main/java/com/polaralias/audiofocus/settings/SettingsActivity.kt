@@ -48,92 +48,130 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "SettingsActivity created")
-        setContent {
-            AudioFocusTheme {
-                // Wrap entire screen in Surface with Material3 colors to ensure proper contrast
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    // Force LocalContentColor to ensure all text uses proper contrast
-                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-                        val state by viewModel.uiState.collectAsState()
-                        val activity = this@SettingsActivity
-                        val hasStarted = remember { mutableStateOf(false) }
-                        LaunchedEffect(
-                            state.hasOverlayPermission,
-                            state.hasAccessibilityAccess,
-                            state.hasNotificationAccess
-                        ) {
-                            try {
-                                val ready =
-                                    state.hasOverlayPermission &&
-                                        state.hasAccessibilityAccess &&
-                                        state.hasNotificationAccess
-                                if (ready && !hasStarted.value) {
-                                    Log.i(TAG, "All permissions granted, starting OverlayService")
-                                    hasStarted.value = true
-                                    try {
-                                        OverlayService.start(activity)
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error starting OverlayService", e)
+        Log.i(TAG, "SettingsActivity onCreate - starting initialization")
+        
+        try {
+            setContent {
+                AudioFocusTheme {
+                    // Wrap entire screen in Surface with Material3 colors to ensure proper contrast
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        // Force LocalContentColor to ensure all text uses proper contrast
+                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                            val state by viewModel.uiState.collectAsState()
+                            val activity = this@SettingsActivity
+                            val hasStarted = remember { mutableStateOf(false) }
+                            
+                            LaunchedEffect(
+                                state.hasOverlayPermission,
+                                state.hasAccessibilityAccess,
+                                state.hasNotificationAccess
+                            ) {
+                                try {
+                                    val ready =
+                                        state.hasOverlayPermission &&
+                                            state.hasAccessibilityAccess &&
+                                            state.hasNotificationAccess
+                                            
+                                    Log.d(TAG, "Permission state changed - ready=$ready, hasStarted=${hasStarted.value}")
+                                    Log.d(TAG, "Permissions: overlay=${state.hasOverlayPermission}, accessibility=${state.hasAccessibilityAccess}, notification=${state.hasNotificationAccess}")
+                                    
+                                    if (ready && !hasStarted.value) {
+                                        Log.i(TAG, "All permissions granted, starting OverlayService")
+                                        hasStarted.value = true
+                                        try {
+                                            OverlayService.start(activity)
+                                            Log.d(TAG, "OverlayService start command sent successfully")
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Error starting OverlayService", e)
+                                            // Don't crash - service may recover or user can retry
+                                        }
+                                    } else if (!ready && hasStarted.value) {
+                                        Log.w(TAG, "Permissions revoked, stopping OverlayService")
+                                        hasStarted.value = false
+                                        try {
+                                            OverlayService.stop(activity)
+                                            Log.d(TAG, "OverlayService stop command sent successfully")
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Error stopping OverlayService", e)
+                                            // Don't crash - service may already be stopped
+                                        }
+                                    } else if (!ready) {
+                                        Log.w(TAG, "Cannot start service - missing permissions: ${state.permissionDiagnostic}")
+                                        hasStarted.value = false
                                     }
-                                } else if (!ready && hasStarted.value) {
-                                    Log.w(TAG, "Permissions revoked, stopping OverlayService")
-                                    hasStarted.value = false
-                                    try {
-                                        OverlayService.stop(activity)
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error stopping OverlayService", e)
-                                    }
-                                } else if (!ready) {
-                                    Log.w(TAG, "Cannot start service: ${state.permissionDiagnostic}")
-                                    hasStarted.value = false
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error in LaunchedEffect permission handling", e)
+                                    // Don't crash - keep UI responsive
                                 }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error in LaunchedEffect", e)
                             }
+                            
+                            SettingsScreen(
+                                state = state,
+                                onToggleYouTube = viewModel::setEnableYouTube,
+                                onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
+                                onToggleStartOnBoot = viewModel::setStartOnBoot,
+                                onDimAmountChange = viewModel::setDimAmount,
+                                onRequestOverlay = { openOverlayPermission() },
+                                onRequestNotification = { openNotificationAccess() },
+                                onRequestAccessibility = { openAccessibilitySettings() }
+                            )
                         }
-                        SettingsScreen(
-                            state = state,
-                            onToggleYouTube = viewModel::setEnableYouTube,
-                            onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
-                            onToggleStartOnBoot = viewModel::setStartOnBoot,
-                            onDimAmountChange = viewModel::setDimAmount,
-                            onRequestOverlay = { openOverlayPermission() },
-                            onRequestNotification = { openNotificationAccess() },
-                            onRequestAccessibility = { openAccessibilitySettings() }
-                        )
                     }
                 }
             }
+            Log.d(TAG, "SettingsActivity content set successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during SettingsActivity onCreate", e)
+            // Don't crash - Compose will render with default state
         }
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "SettingsActivity resumed, refreshing permissions")
-        viewModel.refreshPermissions()
+        Log.i(TAG, "SettingsActivity onResume - refreshing permissions")
+        try {
+            viewModel.refreshPermissions()
+            Log.d(TAG, "Permission refresh initiated successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onResume permission refresh", e)
+        }
     }
 
     private fun openOverlayPermission() {
-        Log.d(TAG, "Opening overlay permission settings")
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName")
-        )
-        startActivity(intent)
+        Log.i(TAG, "Opening overlay permission settings")
+        try {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+            Log.d(TAG, "Overlay permission settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening overlay permission settings", e)
+        }
     }
 
     private fun openNotificationAccess() {
-        Log.d(TAG, "Opening notification access settings")
-        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        Log.i(TAG, "Opening notification access settings")
+        try {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            Log.d(TAG, "Notification access settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening notification access settings", e)
+        }
     }
 
     private fun openAccessibilitySettings() {
-        Log.d(TAG, "Opening accessibility settings")
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        Log.i(TAG, "Opening accessibility settings")
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            Log.d(TAG, "Accessibility settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening accessibility settings", e)
+        }
     }
 }
 
@@ -160,6 +198,18 @@ private fun SettingsScreen(
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground
         )
+        
+        // Show loading message or description based on loading state
+        if (state.isLoading) {
+            Text(
+                text = stringResource(id = R.string.settings_loading), 
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+            // Early return - don't show settings until loaded to prevent flashing default values
+            return
+        }
+        
         Text(
             text = stringResource(id = R.string.settings_description), 
             style = MaterialTheme.typography.bodyMedium,
