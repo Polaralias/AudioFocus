@@ -9,7 +9,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -187,36 +186,6 @@ private fun SettingsScreen(
     onRequestNotification: () -> Unit,
     onRequestAccessibility: () -> Unit
 ) {
-    // Show loading indicator if data is still loading, but also show the UI with defaults
-    // This ensures the UI remains responsive even during initial data load
-    if (state.isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Text(
-                    text = stringResource(id = R.string.settings_title), 
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Loading settings...", 
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                )
-            }
-        }
-        return
-    }
-    
-    // Main settings UI - always renders even if some data failed to load
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -229,6 +198,18 @@ private fun SettingsScreen(
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground
         )
+        
+        // Show loading message or description based on loading state
+        if (state.isLoading) {
+            Text(
+                text = stringResource(id = R.string.settings_loading), 
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+            // Early return - don't show settings until loaded to prevent flashing default values
+            return
+        }
+        
         Text(
             text = stringResource(id = R.string.settings_description), 
             style = MaterialTheme.typography.bodyMedium,

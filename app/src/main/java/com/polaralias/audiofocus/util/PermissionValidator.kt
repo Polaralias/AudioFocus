@@ -59,7 +59,7 @@ object PermissionValidator {
             Log.i(logTag, "Overlay permission check result: $hasOverlay")
         } catch (e: Exception) {
             Log.e(logTag, "Error checking overlay permission", e)
-            hasOverlay = false
+            // hasOverlay already initialized to false
         }
         
         try {
@@ -71,7 +71,7 @@ object PermissionValidator {
             Log.i(logTag, "Notification access check result: $hasNotification")
         } catch (e: Exception) {
             Log.e(logTag, "Error checking notification access", e)
-            hasNotification = false
+            // hasNotification already initialized to false
         }
         
         try {
@@ -81,7 +81,7 @@ object PermissionValidator {
             Log.i(logTag, "Accessibility access check result: $hasAccessibility")
         } catch (e: Exception) {
             Log.e(logTag, "Error checking accessibility access", e)
-            hasAccessibility = false
+            // hasAccessibility already initialized to false
         }
         
         val status = PermissionStatus(hasOverlay, hasNotification, hasAccessibility)
