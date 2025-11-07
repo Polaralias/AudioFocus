@@ -1,15 +1,19 @@
 package com.polaralias.audiofocus.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 private const val DATASTORE_NAME = "audiofocus_preferences"
+private const val TAG = "PreferencesRepository"
 
 private val Context.dataStore by preferencesDataStore(DATASTORE_NAME)
 
@@ -20,47 +24,76 @@ class PreferencesRepository(private val context: Context) {
     private val dimAmountKey = floatPreferencesKey("dim_amount")
     private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
 
-    val preferencesFlow: Flow<OverlayPreferences> = context.dataStore.data.map { prefs ->
-        OverlayPreferences(
-            enableYouTube = prefs[enableYoutubeKey] ?: true,
-            enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
-            startOnBoot = prefs[startOnBootKey] ?: false,
-            dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
-        )
+    val preferencesFlow: Flow<OverlayPreferences> = context.dataStore.data
+        .catch { e ->
+            // Handle IO errors gracefully by emitting default preferences
+            if (e is IOException) {
+                Log.e(TAG, "Error reading preferences, using defaults", e)
+                emit(androidx.datastore.preferences.core.emptyPreferences())
+            } else {
+                throw e
+            }
+        }
+        .map { prefs ->
+            OverlayPreferences(
+                enableYouTube = prefs[enableYoutubeKey] ?: true,
+                enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
+                startOnBoot = prefs[startOnBootKey] ?: false,
+                dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
+            )
+        }
+
+    private suspend fun <T> editPreference(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
+        try {
+            context.dataStore.edit { it[key] = value }
+        } catch (e: IOException) {
+            Log.e(TAG, "Error writing preference: $key", e)
+            throw e
+        }
     }
 
     suspend fun setEnableYouTube(enabled: Boolean) {
-        context.dataStore.edit { it[enableYoutubeKey] = enabled }
+        editPreference(enableYoutubeKey, enabled)
     }
 
     suspend fun setEnableYouTubeMusic(enabled: Boolean) {
-        context.dataStore.edit { it[enableYoutubeMusicKey] = enabled }
+        editPreference(enableYoutubeMusicKey, enabled)
     }
 
     suspend fun setStartOnBoot(enabled: Boolean) {
-        context.dataStore.edit { it[startOnBootKey] = enabled }
+        editPreference(startOnBootKey, enabled)
     }
 
     suspend fun setDimAmount(alpha: Float) {
-        context.dataStore.edit { it[dimAmountKey] = alpha.coerceIn(0.2f, 1f) }
+        editPreference(dimAmountKey, alpha.coerceIn(0.2f, 1f))
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
-        context.dataStore.edit { it[onboardingCompletedKey] = completed }
+        editPreference(onboardingCompletedKey, completed)
     }
 
     suspend fun isOnboardingCompleted(): Boolean {
-        val prefs = context.dataStore.data.first()
-        return prefs[onboardingCompletedKey] ?: false
+        return try {
+            val prefs = context.dataStore.data.first()
+            prefs[onboardingCompletedKey] ?: false
+        } catch (e: IOException) {
+            Log.e(TAG, "Error reading onboardingCompleted preference, assuming false", e)
+            false
+        }
     }
 
     suspend fun current(): OverlayPreferences {
-        val prefs = context.dataStore.data.first()
-        return OverlayPreferences(
-            enableYouTube = prefs[enableYoutubeKey] ?: true,
-            enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
-            startOnBoot = prefs[startOnBootKey] ?: false,
-            dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
-        )
+        return try {
+            val prefs = context.dataStore.data.first()
+            OverlayPreferences(
+                enableYouTube = prefs[enableYoutubeKey] ?: true,
+                enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
+                startOnBoot = prefs[startOnBootKey] ?: false,
+                dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
+            )
+        } catch (e: IOException) {
+            Log.e(TAG, "Error reading current preferences, using defaults", e)
+            OverlayPreferences()
+        }
     }
 }

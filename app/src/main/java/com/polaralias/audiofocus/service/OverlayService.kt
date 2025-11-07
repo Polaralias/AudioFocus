@@ -45,6 +45,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -182,7 +183,10 @@ class OverlayService : Service() {
                 combine(
                     mediaMonitor.state,
                     AccessWindowsService.windowInfo,
-                    preferences.preferencesFlow
+                    preferences.preferencesFlow.catch { e ->
+                        Log.e(TAG, "Error reading preferences in collector, using defaults", e)
+                        emit(com.polaralias.audiofocus.data.OverlayPreferences())
+                    }
                 ) { media, windowInfo, prefs ->
                     val playback = when (media) {
                         is MediaState.Playing -> media.playbackState

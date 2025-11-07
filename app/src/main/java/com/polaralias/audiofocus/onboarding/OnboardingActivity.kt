@@ -53,8 +53,12 @@ class OnboardingActivity : ComponentActivity() {
                 LaunchedEffect(state.isOnboardingComplete) {
                     if (state.isOnboardingComplete) {
                         Log.i(TAG, "Onboarding complete, navigating to SettingsActivity")
-                        startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
-                        finish()
+                        try {
+                            startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
+                            finish()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error navigating to SettingsActivity", e)
+                        }
                     }
                 }
                 
@@ -75,8 +79,12 @@ class OnboardingActivity : ComponentActivity() {
         viewModel.checkIfShouldSkipOnboarding { shouldSkip ->
             if (shouldSkip) {
                 Log.i(TAG, "Skipping onboarding, all permissions granted")
-                startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
-                finish()
+                try {
+                    startActivity(Intent(this@OnboardingActivity, SettingsActivity::class.java))
+                    finish()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error navigating to SettingsActivity during skip", e)
+                }
             }
         }
     }

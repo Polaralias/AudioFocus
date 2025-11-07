@@ -48,19 +48,35 @@ object PermissionValidator {
     fun checkPermissions(context: Context, logTag: String = TAG): PermissionStatus {
         Log.d(logTag, "Starting permission validation")
         
-        // Check overlay permission
-        val hasOverlay = Settings.canDrawOverlays(context)
-        Log.d(logTag, "Overlay permission: $hasOverlay")
+        var hasOverlay = false
+        var hasNotification = false
+        var hasAccessibility = false
         
-        // Check notification access
-        val hasNotification = NotificationManagerCompat
-            .getEnabledListenerPackages(context)
-            .contains(context.packageName)
-        Log.d(logTag, "Notification access: $hasNotification")
+        try {
+            // Check overlay permission
+            hasOverlay = Settings.canDrawOverlays(context)
+            Log.d(logTag, "Overlay permission: $hasOverlay")
+        } catch (e: Exception) {
+            Log.e(logTag, "Error checking overlay permission", e)
+        }
         
-        // Check accessibility access
-        val hasAccessibility = isAccessibilityEnabled(context)
-        Log.d(logTag, "Accessibility access: $hasAccessibility")
+        try {
+            // Check notification access
+            hasNotification = NotificationManagerCompat
+                .getEnabledListenerPackages(context)
+                .contains(context.packageName)
+            Log.d(logTag, "Notification access: $hasNotification")
+        } catch (e: Exception) {
+            Log.e(logTag, "Error checking notification access", e)
+        }
+        
+        try {
+            // Check accessibility access
+            hasAccessibility = isAccessibilityEnabled(context)
+            Log.d(logTag, "Accessibility access: $hasAccessibility")
+        } catch (e: Exception) {
+            Log.e(logTag, "Error checking accessibility access", e)
+        }
         
         val status = PermissionStatus(hasOverlay, hasNotification, hasAccessibility)
         Log.i(logTag, "Permission check result: ${status.getDiagnosticMessage()}")
@@ -84,15 +100,20 @@ object PermissionValidator {
      * Check if accessibility service is enabled
      */
     private fun isAccessibilityEnabled(context: Context): Boolean {
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-        
-        val component = ComponentName(context, AccessWindowsService::class.java)
-        val componentString = component.flattenToString()
-        
-        return enabledServices.split(":")
-            .any { it.equals(componentString, ignoreCase = true) }
+        return try {
+            val enabledServices = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            
+            val component = ComponentName(context, AccessWindowsService::class.java)
+            val componentString = component.flattenToString()
+            
+            enabledServices.split(":")
+                .any { it.equals(componentString, ignoreCase = true) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking accessibility enabled status", e)
+            false
+        }
     }
 }
