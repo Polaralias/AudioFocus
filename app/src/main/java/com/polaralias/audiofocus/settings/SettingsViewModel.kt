@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.service.MediaNotificationListener
+import com.polaralias.audiofocus.service.OverlayServiceStatusTracker
 import com.polaralias.audiofocus.service.ServiceDiagnostics
 import com.polaralias.audiofocus.util.PermissionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error observing service diagnostics", e)
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                OverlayServiceStatusTracker.status.collectLatest { status ->
+                    Log.d(TAG, "Overlay service status updated: $status")
+                    _uiState.update { it.copy(overlayServiceStatus = status) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error observing overlay service status", e)
             }
         }
 

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.service.OverlayService
+import com.polaralias.audiofocus.service.OverlayServiceState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
 import kotlinx.coroutines.delay
 
@@ -252,118 +253,142 @@ private fun SettingsScreen(
         // Show loading message or description based on loading state
         if (state.isLoading) {
             Text(
-                text = stringResource(id = R.string.settings_loading), 
+                text = stringResource(id = R.string.settings_loading),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
             )
-            // Early return - don't show settings until loaded to prevent flashing default values
-            return
-        }
-        
-        Text(
-            text = stringResource(id = R.string.settings_description), 
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        
-        // Display permission diagnostic if any permissions are missing
-        if (state.permissionDiagnostic.isNotEmpty() &&
-            (!state.hasOverlayPermission ||
-                !state.hasNotificationAccess ||
-                !state.canPostNotifications ||
-                !state.hasAccessibilityAccess)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "⚠️ Permission Status",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Text(
-                    text = state.permissionDiagnostic,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+        } else {
+            Text(
+                text = stringResource(id = R.string.settings_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
         }
 
-        if (state.serviceDiagnostic.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+        val overlayStatus = state.overlayServiceStatus
+        val baseStatusMessage = when (overlayStatus.state) {
+            OverlayServiceState.STARTING -> stringResource(id = R.string.overlay_status_starting)
+            OverlayServiceState.RUNNING -> stringResource(id = R.string.overlay_status_running)
+            OverlayServiceState.WAITING_FOR_MEDIA -> stringResource(id = R.string.overlay_status_waiting)
+            OverlayServiceState.STOPPED -> stringResource(id = R.string.overlay_status_stopped)
+            OverlayServiceState.ERROR -> stringResource(id = R.string.overlay_status_error_generic)
+        }
+        val statusText = if (overlayStatus.state == OverlayServiceState.ERROR) {
+            overlayStatus.detail?.takeIf { it.isNotBlank() } ?: baseStatusMessage
+        } else {
+            baseStatusMessage
+        }
+        val statusColor = if (overlayStatus.state == OverlayServiceState.ERROR) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onBackground
+        }
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = statusColor
+        )
+
+        if (!state.isLoading) {
+            // Display permission diagnostic if any permissions are missing
+            if (state.permissionDiagnostic.isNotEmpty() &&
+                (!state.hasOverlayPermission ||
+                    !state.hasNotificationAccess ||
+                    !state.canPostNotifications ||
+                    !state.hasAccessibilityAccess)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "⚠️ Permission Status",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = state.permissionDiagnostic,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            if (state.serviceDiagnostic.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "⚠️ Service Status",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = state.serviceDiagnostic,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            ToggleRow(
+                title = stringResource(id = R.string.toggle_youtube),
+                checked = state.preferences.enableYouTube,
+                onToggle = onToggleYouTube
+            )
+            ToggleRow(
+                title = stringResource(id = R.string.toggle_youtube_music),
+                checked = state.preferences.enableYouTubeMusic,
+                onToggle = onToggleYouTubeMusic
+            )
+            ToggleRow(
+                title = stringResource(id = R.string.toggle_boot),
+                checked = state.preferences.startOnBoot,
+                onToggle = onToggleStartOnBoot
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "⚠️ Service Status",
+                    text = stringResource(id = R.string.dim_amount),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Slider(
+                    value = state.preferences.dimAmount,
+                    onValueChange = onDimAmountChange,
+                    valueRange = 0.2f..1f,
+                    steps = 7
                 )
                 Text(
-                    text = state.serviceDiagnostic,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
+                    text = String.format("%.0f%%", state.preferences.dimAmount * 100f),
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
-        }
-        
-        ToggleRow(
-            title = stringResource(id = R.string.toggle_youtube),
-            checked = state.preferences.enableYouTube,
-            onToggle = onToggleYouTube
-        )
-        ToggleRow(
-            title = stringResource(id = R.string.toggle_youtube_music),
-            checked = state.preferences.enableYouTubeMusic,
-            onToggle = onToggleYouTubeMusic
-        )
-        ToggleRow(
-            title = stringResource(id = R.string.toggle_boot),
-            checked = state.preferences.startOnBoot,
-            onToggle = onToggleStartOnBoot
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(id = R.string.dim_amount), 
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
+            PermissionRow(
+                title = stringResource(id = R.string.permission_overlay),
+                granted = state.hasOverlayPermission,
+                onClick = onRequestOverlay
             )
-            Slider(
-                value = state.preferences.dimAmount,
-                onValueChange = onDimAmountChange,
-                valueRange = 0.2f..1f,
-                steps = 7
+            PermissionRow(
+                title = stringResource(id = R.string.permission_notification),
+                granted = state.hasNotificationAccess && state.canPostNotifications,
+                onClick = onRequestNotification
+            )
+            PermissionRow(
+                title = stringResource(id = R.string.permission_accessibility),
+                granted = state.hasAccessibilityAccess,
+                onClick = onRequestAccessibility
             )
             Text(
-                text = String.format("%.0f%%", state.preferences.dimAmount * 100f), 
-                fontWeight = FontWeight.Medium,
+                text = stringResource(id = R.string.touch_disclaimer),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
-        PermissionRow(
-            title = stringResource(id = R.string.permission_overlay),
-            granted = state.hasOverlayPermission,
-            onClick = onRequestOverlay
-        )
-        PermissionRow(
-            title = stringResource(id = R.string.permission_notification),
-            granted = state.hasNotificationAccess && state.canPostNotifications,
-            onClick = onRequestNotification
-        )
-        PermissionRow(
-            title = stringResource(id = R.string.permission_accessibility),
-            granted = state.hasAccessibilityAccess,
-            onClick = onRequestAccessibility
-        )
-        Text(
-            text = stringResource(id = R.string.touch_disclaimer), 
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
         Spacer(modifier = Modifier.weight(1f, fill = true))
     }
 }

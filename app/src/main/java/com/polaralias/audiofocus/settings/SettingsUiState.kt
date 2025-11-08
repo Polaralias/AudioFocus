@@ -1,6 +1,8 @@
 package com.polaralias.audiofocus.settings
 
 import com.polaralias.audiofocus.data.OverlayPreferences
+import com.polaralias.audiofocus.service.OverlayServiceState
+import com.polaralias.audiofocus.service.OverlayServiceStatus
 
 data class SettingsUiState(
     val preferences: OverlayPreferences = OverlayPreferences(),
@@ -11,5 +13,6 @@ data class SettingsUiState(
     val permissionDiagnostic: String = "",
     val notificationListenerConnected: Boolean = false,
     val serviceDiagnostic: String = "",
+    val overlayServiceStatus: OverlayServiceStatus = OverlayServiceStatus(OverlayServiceState.STOPPED),
     val isLoading: Boolean = true // Indicates whether initial data is still being loaded
 )

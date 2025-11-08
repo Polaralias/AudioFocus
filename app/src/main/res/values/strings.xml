@@ -73,4 +73,10 @@
     
     <!-- Settings loading -->
     <string name="settings_loading">Loading settings…</string>
+    <string name="overlay_status_starting">Overlay service starting…</string>
+    <string name="overlay_status_running">Overlay service running</string>
+    <string name="overlay_status_waiting">Overlay service waiting for playback</string>
+    <string name="overlay_status_stopped">Overlay service stopped</string>
+    <string name="overlay_status_error_generic">Overlay service stopped unexpectedly. Check permissions and restart.</string>
+    <string name="overlay_status_error_notifications">Enable app notifications so AudioFocus can keep the overlay running.</string>
 </resources>

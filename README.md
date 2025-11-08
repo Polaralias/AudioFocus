@@ -60,6 +60,14 @@ The app uses a clean architecture with the following layers:
 ./gradlew connectedAndroidTest
 ```
 
+## Manual QA checklist
+
+Use a device or emulator with YouTube installed to verify the settings status banner:
+
+1. Launch AudioFocus and grant overlay, notification listener, and accessibility permissions. Start playback in YouTube and confirm the settings screen shows “Overlay service running”.
+2. Pause or stop playback while keeping the service running. Return to settings and verify the message changes to “Overlay service waiting for playback”.
+3. Revoke the app’s notification permission or stop the overlay service via the notification. Reopen settings and ensure the banner shows the error text reported by the service (for example, the notification warning) until the issue is resolved.
+
 ## Project Status
 
 ✅ All critical issues have been resolved

@@ -77,8 +77,11 @@ class OverlayService : Service() {
                     TAG,
                     "Cannot start OverlayService - notifications are disabled or POST_NOTIFICATIONS not granted"
                 )
+                val message = context.getString(R.string.overlay_status_error_notifications)
+                OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, message)
                 return
             }
+            OverlayServiceStatusTracker.update(OverlayServiceState.STARTING)
             ServiceDiagnostics.clear()
             ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
         }
@@ -127,6 +130,7 @@ class OverlayService : Service() {
                 val fullMessage = "$diagnostic\n${permissionStatus.getDiagnosticMessage()}"
                 Log.e(TAG, "Service cannot start: $fullMessage")
                 ServiceDiagnostics.report(fullMessage)
+                OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, fullMessage)
                 Log.e(TAG, "Stopping service immediately to prevent crashes")
                 stopSelf()
                 return
@@ -156,8 +160,10 @@ class OverlayService : Service() {
                 return
             }
             Log.i(TAG, "OverlayService initialized successfully with overlay views attached")
+            OverlayServiceStatusTracker.update(OverlayServiceState.WAITING_FOR_MEDIA)
         } catch (e: Exception) {
             Log.e(TAG, "Fatal error initializing OverlayService", e)
+            OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, e.message)
             stopSelf()
         }
     }
@@ -206,12 +212,14 @@ class OverlayService : Service() {
                     val fullMessage = "$diagnostic\n${status.getDiagnosticMessage()}"
                     Log.e(TAG, "Giving up on collector startup: $fullMessage", e)
                     ServiceDiagnostics.report(fullMessage)
+                    OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, fullMessage)
                     return false
                 }
                 SystemClock.sleep(PERMISSION_RETRY_DELAY_MS)
                 attempt++
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error starting collectors", e)
+                OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, e.message)
                 return false
             }
         }
@@ -273,6 +281,9 @@ class OverlayService : Service() {
             Log.i(TAG, "OverlayService cleanup completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during service cleanup", e)
+        }
+        if (OverlayServiceStatusTracker.status.value.state != OverlayServiceState.ERROR) {
+            OverlayServiceStatusTracker.update(OverlayServiceState.STOPPED)
         }
     }
 
@@ -342,7 +353,13 @@ class OverlayService : Service() {
     private fun applyRenderState(renderState: OverlayRenderState) {
         updateCommander(renderState.mediaState)
         updateControls(renderState.mediaState, renderState.overlayState)
-        
+
+        when (renderState.mediaState) {
+            is MediaState.Playing -> OverlayServiceStatusTracker.update(OverlayServiceState.RUNNING)
+            is MediaState.Paused -> OverlayServiceStatusTracker.update(OverlayServiceState.WAITING_FOR_MEDIA)
+            MediaState.Idle -> OverlayServiceStatusTracker.update(OverlayServiceState.WAITING_FOR_MEDIA)
+        }
+
         // NEW BEHAVIOR: Use debouncing and grace period to prevent flicker
         // Instead of immediately showing/hiding overlay, we schedule the change with a delay
         // This allows us to ignore transient state changes and rapid transitions
@@ -703,12 +720,16 @@ class OverlayService : Service() {
         Log.i(TAG, "Stopping service from request")
         try {
             releaseOverlayResources()
+            if (OverlayServiceStatusTracker.status.value.state != OverlayServiceState.ERROR) {
+                OverlayServiceStatusTracker.update(OverlayServiceState.STOPPED)
+            }
             stopSelf()
             Log.d(TAG, "Service stop completed")
         } catch (e: Exception) {
             Log.e(TAG, "Error during service stop", e)
             // Still try to stop self even on error
             try {
+                OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, e.message)
                 stopSelf()
             } catch (e2: Exception) {
                 Log.e(TAG, "Error calling stopSelf", e2)
