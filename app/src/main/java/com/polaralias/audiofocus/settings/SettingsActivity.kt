@@ -134,12 +134,14 @@ class SettingsActivity : ComponentActivity() {
                                 onDimAmountChange = viewModel::setDimAmount,
                                 onRequestOverlay = { openOverlayPermission() },
                                 onRequestNotification = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                        !state.canPostNotifications
-                                    ) {
-                                        requestPostNotificationPermission()
-                                    } else {
-                                        openNotificationAccess()
+                                    when {
+                                        !state.hasNotificationAccess -> openNotificationAccess()
+                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                            !state.canPostNotifications -> {
+                                            requestPostNotificationPermission()
+                                        }
+                                        !state.canPostNotifications -> openAppNotificationSettings()
+                                        else -> openNotificationAccess()
                                     }
                                 },
                                 onRequestAccessibility = { openAccessibilitySettings() }
@@ -198,6 +200,35 @@ class SettingsActivity : ComponentActivity() {
             Log.d(TAG, "Notification access settings opened successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error opening notification access settings", e)
+        }
+    }
+
+    private fun openAppNotificationSettings() {
+        Log.i(TAG, "Opening app notification settings")
+        try {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra("android.provider.extra.APP_PACKAGE", packageName)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                } else {
+                    putExtra("app_package", packageName)
+                    putExtra("app_uid", applicationInfo.uid)
+                }
+            }
+            startActivity(intent)
+            Log.d(TAG, "App notification settings opened successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening app notification settings", e)
+            try {
+                val fallbackIntent = Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(fallbackIntent)
+                Log.d(TAG, "Application details settings opened as fallback")
+            } catch (fallback: Exception) {
+                Log.e(TAG, "Error opening application details settings fallback", fallback)
+            }
         }
     }
 
