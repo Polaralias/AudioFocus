@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.util.PermissionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,20 +72,27 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 
                 val currentStep = when {
                     !permissionStatus.hasOverlayPermission -> OnboardingStep.OVERLAY
-                    !permissionStatus.hasNotificationAccess -> OnboardingStep.NOTIFICATION
+                    !permissionStatus.hasNotificationAccess || !permissionStatus.canPostNotifications ->
+                        OnboardingStep.NOTIFICATION
                     !permissionStatus.hasAccessibilityAccess -> OnboardingStep.ACCESSIBILITY
                     else -> OnboardingStep.COMPLETE
                 }
-                
+
                 Log.i(TAG, "Permission check result - Step: $currentStep, Status: ${permissionStatus.getDiagnosticMessage()}")
-                
+
                 _uiState.update {
                     it.copy(
                         currentStep = currentStep,
                         hasOverlayPermission = permissionStatus.hasOverlayPermission,
                         hasNotificationAccess = permissionStatus.hasNotificationAccess,
+                        canPostNotifications = permissionStatus.canPostNotifications,
                         hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
-                        showError = false
+                        showError = false,
+                        permissionDiagnostic = if (permissionStatus.allPermissionsGranted) {
+                            ""
+                        } else {
+                            permissionStatus.getDiagnosticMessage()
+                        }
                     )
                 }
                 
@@ -105,7 +113,24 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun onPermissionDenied() {
         Log.w(TAG, "Permission denied")
-        _uiState.update { it.copy(showError = true) }
+        val context = getApplication<Application>()
+        _uiState.update {
+            it.copy(
+                showError = true,
+                permissionDiagnostic = context.getString(R.string.onboarding_error_message)
+            )
+        }
+    }
+
+    fun onPostNotificationsPermissionDenied() {
+        Log.w(TAG, "POST_NOTIFICATIONS permission denied")
+        val context = getApplication<Application>()
+        _uiState.update {
+            it.copy(
+                showError = true,
+                permissionDiagnostic = context.getString(R.string.post_notification_permission_required)
+            )
+        }
     }
 
     fun completeOnboarding() {
@@ -144,8 +169,10 @@ data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.WELCOME,
     val hasOverlayPermission: Boolean = false,
     val hasNotificationAccess: Boolean = false,
+    val canPostNotifications: Boolean = false,
     val hasAccessibilityAccess: Boolean = false,
     val showError: Boolean = false,
+    val permissionDiagnostic: String = "",
     val isOnboardingComplete: Boolean = false
 )
 

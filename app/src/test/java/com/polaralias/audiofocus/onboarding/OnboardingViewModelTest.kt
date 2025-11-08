@@ -47,6 +47,7 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.OVERLAY, state.currentStep)
         assertFalse(state.hasOverlayPermission)
         assertFalse(state.hasNotificationAccess)
+        assertTrue(state.canPostNotifications)
         assertFalse(state.hasAccessibilityAccess)
         assertFalse(state.showError)
         assertFalse(state.isOnboardingComplete)

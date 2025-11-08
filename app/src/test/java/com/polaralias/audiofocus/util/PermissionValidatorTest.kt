@@ -24,9 +24,10 @@ class PermissionValidatorTest {
     @Test
     fun `checkPermissions returns all false when no permissions granted`() {
         val status = PermissionValidator.checkPermissions(context)
-        
+
         assertFalse(status.hasOverlayPermission)
         assertFalse(status.hasNotificationAccess)
+        assertTrue(status.canPostNotifications)
         assertFalse(status.hasAccessibilityAccess)
         assertFalse(status.allPermissionsGranted)
     }
@@ -64,9 +65,10 @@ class PermissionValidatorTest {
         val status = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = true,
+            canPostNotifications = true,
             hasAccessibilityAccess = true
         )
-        
+
         val message = status.getDiagnosticMessage()
         assertEquals("All permissions granted", message)
     }
@@ -76,9 +78,10 @@ class PermissionValidatorTest {
         val status = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = true,
+            canPostNotifications = true,
             hasAccessibilityAccess = true
         )
-        
+
         assertTrue(status.allPermissionsGranted)
     }
 
@@ -87,22 +90,33 @@ class PermissionValidatorTest {
         val status1 = PermissionValidator.PermissionStatus(
             hasOverlayPermission = false,
             hasNotificationAccess = true,
+            canPostNotifications = true,
             hasAccessibilityAccess = true
         )
         assertFalse(status1.allPermissionsGranted)
-        
+
         val status2 = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = false,
+            canPostNotifications = true,
             hasAccessibilityAccess = true
         )
         assertFalse(status2.allPermissionsGranted)
-        
+
         val status3 = PermissionValidator.PermissionStatus(
             hasOverlayPermission = true,
             hasNotificationAccess = true,
+            canPostNotifications = true,
             hasAccessibilityAccess = false
         )
         assertFalse(status3.allPermissionsGranted)
+
+        val status4 = PermissionValidator.PermissionStatus(
+            hasOverlayPermission = true,
+            hasNotificationAccess = true,
+            canPostNotifications = false,
+            hasAccessibilityAccess = true
+        )
+        assertFalse(status4.allPermissionsGranted)
     }
 }

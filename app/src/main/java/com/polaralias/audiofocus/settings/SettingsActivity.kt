@@ -1,12 +1,15 @@
 package com.polaralias.audiofocus.settings
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,6 +48,16 @@ class SettingsActivity : ComponentActivity() {
     }
 
     private val viewModel: SettingsViewModel by viewModels()
+    private val requestPostNotificationsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                Log.i(TAG, "POST_NOTIFICATIONS permission granted in settings")
+                viewModel.refreshPermissions()
+            } else {
+                Log.w(TAG, "POST_NOTIFICATIONS permission denied in settings")
+                viewModel.onPostNotificationsPermissionDenied()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,16 +80,21 @@ class SettingsActivity : ComponentActivity() {
                             LaunchedEffect(
                                 state.hasOverlayPermission,
                                 state.hasAccessibilityAccess,
-                                state.hasNotificationAccess
+                                state.hasNotificationAccess,
+                                state.canPostNotifications
                             ) {
                                 try {
                                     val ready =
                                         state.hasOverlayPermission &&
                                             state.hasAccessibilityAccess &&
-                                            state.hasNotificationAccess
-                                            
+                                            state.hasNotificationAccess &&
+                                            state.canPostNotifications
+
                                     Log.d(TAG, "Permission state changed - ready=$ready, hasStarted=${hasStarted.value}")
-                                    Log.d(TAG, "Permissions: overlay=${state.hasOverlayPermission}, accessibility=${state.hasAccessibilityAccess}, notification=${state.hasNotificationAccess}")
+                                    Log.d(
+                                        TAG,
+                                        "Permissions: overlay=${state.hasOverlayPermission}, accessibility=${state.hasAccessibilityAccess}, notificationAccess=${state.hasNotificationAccess}, canPost=${state.canPostNotifications}"
+                                    )
                                     
                                     if (ready && !hasStarted.value) {
                                         Log.i(TAG, "All permissions granted, starting OverlayService")
@@ -115,7 +133,15 @@ class SettingsActivity : ComponentActivity() {
                                 onToggleStartOnBoot = viewModel::setStartOnBoot,
                                 onDimAmountChange = viewModel::setDimAmount,
                                 onRequestOverlay = { openOverlayPermission() },
-                                onRequestNotification = { openNotificationAccess() },
+                                onRequestNotification = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        !state.canPostNotifications
+                                    ) {
+                                        requestPostNotificationPermission()
+                                    } else {
+                                        openNotificationAccess()
+                                    }
+                                },
                                 onRequestAccessibility = { openAccessibilitySettings() }
                             )
                         }
@@ -137,6 +163,17 @@ class SettingsActivity : ComponentActivity() {
             Log.d(TAG, "Permission refresh initiated successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during onResume permission refresh", e)
+        }
+    }
+
+    private fun requestPostNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                requestPostNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                Log.d(TAG, "POST_NOTIFICATIONS permission request launched from settings")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error requesting POST_NOTIFICATIONS permission in settings", e)
+            }
         }
     }
 
@@ -217,8 +254,11 @@ private fun SettingsScreen(
         )
         
         // Display permission diagnostic if any permissions are missing
-        if (state.permissionDiagnostic.isNotEmpty() && 
-            (!state.hasOverlayPermission || !state.hasNotificationAccess || !state.hasAccessibilityAccess)) {
+        if (state.permissionDiagnostic.isNotEmpty() &&
+            (!state.hasOverlayPermission ||
+                !state.hasNotificationAccess ||
+                !state.canPostNotifications ||
+                !state.hasAccessibilityAccess)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -278,7 +318,7 @@ private fun SettingsScreen(
         )
         PermissionRow(
             title = stringResource(id = R.string.permission_notification),
-            granted = state.hasNotificationAccess,
+            granted = state.hasNotificationAccess && state.canPostNotifications,
             onClick = onRequestNotification
         )
         PermissionRow(

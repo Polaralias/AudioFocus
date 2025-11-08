@@ -1,10 +1,14 @@
 package com.polaralias.audiofocus.util
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.polaralias.audiofocus.service.AccessWindowsService
 
 /**
@@ -20,15 +24,21 @@ object PermissionValidator {
     data class PermissionStatus(
         val hasOverlayPermission: Boolean,
         val hasNotificationAccess: Boolean,
+        val canPostNotifications: Boolean,
         val hasAccessibilityAccess: Boolean
     ) {
         val allPermissionsGranted: Boolean
-            get() = hasOverlayPermission && hasNotificationAccess && hasAccessibilityAccess
+            get() =
+                hasOverlayPermission &&
+                    hasNotificationAccess &&
+                    canPostNotifications &&
+                    hasAccessibilityAccess
 
         fun getMissingPermissions(): List<String> {
             val missing = mutableListOf<String>()
             if (!hasOverlayPermission) missing.add("Overlay Permission")
             if (!hasNotificationAccess) missing.add("Notification Access")
+            if (!canPostNotifications) missing.add("Notification Permission")
             if (!hasAccessibilityAccess) missing.add("Accessibility Access")
             return missing
         }
@@ -50,6 +60,7 @@ object PermissionValidator {
         
         var hasOverlay = false
         var hasNotification = false
+        var canPostNotifications = false
         var hasAccessibility = false
         
         try {
@@ -71,7 +82,31 @@ object PermissionValidator {
         } catch (e: Exception) {
             Log.e(logTag, "Error checking notification access", e)
         }
-        
+
+        try {
+            Log.d(logTag, "Checking notification posting capability...")
+            val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            val runtimeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+            Log.i(
+                logTag,
+                "Notification posting checks - runtimeGranted=$runtimeGranted, notificationsEnabled=$notificationsEnabled"
+            )
+
+            canPostNotifications = runtimeGranted && notificationsEnabled
+            Log.i(logTag, "Notification posting capability result: $canPostNotifications")
+        } catch (e: Exception) {
+            Log.e(logTag, "Error checking notification posting capability", e)
+            canPostNotifications = false
+        }
+
         try {
             // Check accessibility access
             Log.d(logTag, "Checking accessibility access...")
@@ -80,8 +115,8 @@ object PermissionValidator {
         } catch (e: Exception) {
             Log.e(logTag, "Error checking accessibility access", e)
         }
-        
-        val status = PermissionStatus(hasOverlay, hasNotification, hasAccessibility)
+
+        val status = PermissionStatus(hasOverlay, hasNotification, canPostNotifications, hasAccessibility)
         Log.i(logTag, "Permission check completed: ${status.getDiagnosticMessage()}")
         
         return status
