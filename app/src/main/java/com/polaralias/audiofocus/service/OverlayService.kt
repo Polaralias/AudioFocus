@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
+import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.media.MediaSessionMonitor
 import com.polaralias.audiofocus.model.MediaState
@@ -56,14 +57,17 @@ class OverlayService : Service() {
         private const val TAG = "OverlayService"
         private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
         private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
-        
+
         // Debounce period: Wait this long before applying state changes to prevent flicker
         // on rapid state transitions (e.g., transient window state changes during animations)
         private const val DEBOUNCE_DELAY_MS = 300L
-        
+
         // Grace period: Once overlay is visible, tolerate brief "hide" signals for this duration
         // This prevents overlay from disappearing during momentary detection mismatches
         private const val GRACE_PERIOD_MS = 500L
+
+        private const val PERMISSION_RETRY_DELAY_MS = 1000L
+        private const val PERMISSION_MAX_ATTEMPTS = 3
 
         fun start(context: Context) {
             Log.d(TAG, "Requesting service start")
@@ -75,6 +79,7 @@ class OverlayService : Service() {
                 )
                 return
             }
+            ServiceDiagnostics.clear()
             ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
         }
 
@@ -112,19 +117,22 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "OverlayService onCreate - starting initialization")
-        
+
         try {
             // Validate permissions before initializing
             Log.d(TAG, "Checking permissions before service initialization")
-            val permissionStatus = PermissionValidator.checkPermissions(applicationContext, TAG)
+            val permissionStatus = verifyPermissionsWithRetry()
             if (!permissionStatus.allPermissionsGranted) {
-                Log.e(TAG, "Service started without required permissions: ${permissionStatus.getDiagnosticMessage()}")
+                val diagnostic = getString(R.string.diagnostic_notification_listener_retry_exhausted)
+                val fullMessage = "$diagnostic\n${permissionStatus.getDiagnosticMessage()}"
+                Log.e(TAG, "Service cannot start: $fullMessage")
+                ServiceDiagnostics.report(fullMessage)
                 Log.e(TAG, "Stopping service immediately to prevent crashes")
                 stopSelf()
                 return
             }
             Log.i(TAG, "All permissions verified - proceeding with service initialization")
-            
+
             windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             preferences = PreferencesRepository(applicationContext)
             mediaMonitor = MediaSessionMonitor(this, scope)
@@ -140,14 +148,74 @@ class OverlayService : Service() {
             // Views stay attached as long as overlay permission is granted and service is running
             Log.d(TAG, "Attaching overlay views to WindowManager")
             attachOverlayViews()
-            
+
             Log.d(TAG, "Starting data collectors")
-            startCollectors()
+            if (!ensureCollectorsStartedWithRetry()) {
+                Log.e(TAG, "Failed to start collectors after retries, stopping service")
+                stopSelf()
+                return
+            }
             Log.i(TAG, "OverlayService initialized successfully with overlay views attached")
         } catch (e: Exception) {
             Log.e(TAG, "Fatal error initializing OverlayService", e)
             stopSelf()
         }
+    }
+
+    private fun verifyPermissionsWithRetry(): PermissionValidator.PermissionStatus {
+        var attempt = 1
+        var status = PermissionValidator.checkPermissions(applicationContext, TAG)
+        while (!status.allPermissionsGranted && attempt < PERMISSION_MAX_ATTEMPTS) {
+            Log.w(
+                TAG,
+                "Permission check failed (attempt $attempt/$PERMISSION_MAX_ATTEMPTS): ${status.getDiagnosticMessage()} - retrying in ${PERMISSION_RETRY_DELAY_MS}ms"
+            )
+            SystemClock.sleep(PERMISSION_RETRY_DELAY_MS)
+            attempt++
+            status = PermissionValidator.checkPermissions(applicationContext, TAG)
+        }
+        if (!status.allPermissionsGranted) {
+            Log.e(
+                TAG,
+                "Permissions still missing after $attempt attempts: ${status.getDiagnosticMessage()}"
+            )
+        }
+        return status
+    }
+
+    private fun ensureCollectorsStartedWithRetry(): Boolean {
+        if (collectorsStarted) {
+            Log.d(TAG, "Collectors already started, skipping retry")
+            return true
+        }
+        var attempt = 1
+        while (attempt <= PERMISSION_MAX_ATTEMPTS) {
+            try {
+                startCollectorsInternal()
+                ServiceDiagnostics.clear()
+                return true
+            } catch (e: SecurityException) {
+                val status = PermissionValidator.checkPermissions(applicationContext, TAG)
+                Log.w(
+                    TAG,
+                    "Media session listener registration failed (attempt $attempt/$PERMISSION_MAX_ATTEMPTS): ${status.getDiagnosticMessage()} - retrying",
+                    e
+                )
+                if (attempt >= PERMISSION_MAX_ATTEMPTS) {
+                    val diagnostic = getString(R.string.diagnostic_notification_listener_retry_exhausted)
+                    val fullMessage = "$diagnostic\n${status.getDiagnosticMessage()}"
+                    Log.e(TAG, "Giving up on collector startup: $fullMessage", e)
+                    ServiceDiagnostics.report(fullMessage)
+                    return false
+                }
+                SystemClock.sleep(PERMISSION_RETRY_DELAY_MS)
+                attempt++
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error starting collectors", e)
+                return false
+            }
+        }
+        return false
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -179,7 +247,11 @@ class OverlayService : Service() {
                 stopFromRequest()
                 return START_NOT_STICKY
             }
-            startCollectors()
+            if (!ensureCollectorsStartedWithRetry()) {
+                Log.w(TAG, "Collectors failed to start during onStartCommand, stopping service")
+                stopFromRequest()
+                return START_NOT_STICKY
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error in onStartCommand", e)
         }
@@ -204,19 +276,18 @@ class OverlayService : Service() {
         }
     }
 
-    private fun startCollectors() {
+    private fun startCollectorsInternal() {
         if (collectorsStarted) {
             Log.d(TAG, "Collectors already started, skipping")
             return
         }
-        collectorsStarted = true
         Log.i(TAG, "Starting data collectors")
-        
+
         try {
             val component = ComponentName(this, MediaNotificationListener::class.java)
             mediaMonitor.start(component)
             Log.d(TAG, "Media monitor started")
-            
+
             scope.launch {
                 try {
                     Log.d(TAG, "Starting combined flow collection")
@@ -255,9 +326,16 @@ class OverlayService : Service() {
                     Log.e(TAG, "Error in data collectors flow", e)
                 }
             }
+            collectorsStarted = true
             Log.i(TAG, "Data collectors started successfully")
+        } catch (e: SecurityException) {
+            collectorsStarted = false
+            Log.w(TAG, "SecurityException while starting collectors", e)
+            throw e
         } catch (e: Exception) {
+            collectorsStarted = false
             Log.e(TAG, "Error starting collectors", e)
+            throw e
         }
     }
 

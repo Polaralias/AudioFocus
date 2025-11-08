@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
+import com.polaralias.audiofocus.service.MediaNotificationListener
+import com.polaralias.audiofocus.service.ServiceDiagnostics
 import com.polaralias.audiofocus.util.PermissionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,7 +51,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
-        
+
+        viewModelScope.launch {
+            try {
+                MediaNotificationListener.connected.collectLatest { connected ->
+                    Log.d(TAG, "Notification listener connection state changed: $connected")
+                    _uiState.update { it.copy(notificationListenerConnected = connected) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error observing notification listener connection", e)
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                ServiceDiagnostics.message.collectLatest { message ->
+                    Log.d(TAG, "Service diagnostic updated: $message")
+                    _uiState.update { it.copy(serviceDiagnostic = message) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error observing service diagnostics", e)
+            }
+        }
+
         // Refresh permissions asynchronously
         Log.d(TAG, "Initiating initial permission refresh")
         refreshPermissions()

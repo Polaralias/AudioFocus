@@ -9,5 +9,7 @@ data class SettingsUiState(
     val canPostNotifications: Boolean = false,
     val hasAccessibilityAccess: Boolean = false,
     val permissionDiagnostic: String = "",
+    val notificationListenerConnected: Boolean = false,
+    val serviceDiagnostic: String = "",
     val isLoading: Boolean = true // Indicates whether initial data is still being loaded
 )
