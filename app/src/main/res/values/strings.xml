@@ -15,6 +15,7 @@
     <string name="permission_action_manage">Manage access</string>
     <string name="touch_disclaimer">Some devices may block touches under overlays. Disable per-app rules if this interferes.</string>
     <string name="settings_description">Grant permissions so AudioFocus can show transport controls over YouTube video playback.</string>
+    <string name="diagnostic_notification_listener_retry_exhausted">AudioFocus still can’t access the notification listener. Please reopen the app to finish setup.</string>
     <string name="overlay_service_channel">AudioFocus overlay</string>
     <string name="overlay_service_active">Overlay active</string>
     <string name="overlay_service_description">Showing transport controls over media playback.</string>

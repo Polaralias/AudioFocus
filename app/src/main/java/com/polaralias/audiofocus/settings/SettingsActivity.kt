@@ -41,6 +41,7 @@ import androidx.compose.material3.LocalContentColor
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.service.OverlayService
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
+import kotlinx.coroutines.delay
 
 class SettingsActivity : ComponentActivity() {
     companion object {
@@ -81,7 +82,8 @@ class SettingsActivity : ComponentActivity() {
                                 state.hasOverlayPermission,
                                 state.hasAccessibilityAccess,
                                 state.hasNotificationAccess,
-                                state.canPostNotifications
+                                state.canPostNotifications,
+                                state.notificationListenerConnected
                             ) {
                                 try {
                                     val ready =
@@ -89,23 +91,34 @@ class SettingsActivity : ComponentActivity() {
                                             state.hasAccessibilityAccess &&
                                             state.hasNotificationAccess &&
                                             state.canPostNotifications
+                                    val listenerConnected = state.notificationListenerConnected
 
-                                    Log.d(TAG, "Permission state changed - ready=$ready, hasStarted=${hasStarted.value}")
+                                    Log.d(
+                                        TAG,
+                                        "Permission state changed - ready=$ready, " +
+                                            "listenerConnected=$listenerConnected, hasStarted=${hasStarted.value}"
+                                    )
                                     Log.d(
                                         TAG,
                                         "Permissions: overlay=${state.hasOverlayPermission}, accessibility=${state.hasAccessibilityAccess}, notificationAccess=${state.hasNotificationAccess}, canPost=${state.canPostNotifications}"
                                     )
-                                    
-                                    if (ready && !hasStarted.value) {
-                                        Log.i(TAG, "All permissions granted, starting OverlayService")
+
+                                    if (ready && listenerConnected && !hasStarted.value) {
+                                        Log.i(TAG, "All permissions and notification listener ready, starting OverlayService")
                                         hasStarted.value = true
                                         try {
+                                            delay(300)
                                             OverlayService.start(activity)
                                             Log.d(TAG, "OverlayService start command sent successfully")
                                         } catch (e: Exception) {
                                             Log.e(TAG, "Error starting OverlayService", e)
                                             // Don't crash - service may recover or user can retry
                                         }
+                                    } else if (ready && !listenerConnected) {
+                                        Log.i(
+                                            TAG,
+                                            "All permissions granted but notification listener not connected yet; waiting before starting"
+                                        )
                                     } else if (!ready && hasStarted.value) {
                                         Log.w(TAG, "Permissions revoked, stopping OverlayService")
                                         hasStarted.value = false
@@ -272,6 +285,26 @@ private fun SettingsScreen(
                 )
                 Text(
                     text = state.permissionDiagnostic,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+
+        if (state.serviceDiagnostic.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "⚠️ Service Status",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = state.serviceDiagnostic,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
                 )
