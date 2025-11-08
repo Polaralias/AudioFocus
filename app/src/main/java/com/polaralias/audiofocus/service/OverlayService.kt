@@ -67,6 +67,14 @@ class OverlayService : Service() {
 
         fun start(context: Context) {
             Log.d(TAG, "Requesting service start")
+            val permissionStatus = PermissionValidator.checkPermissions(context.applicationContext, TAG)
+            if (!permissionStatus.canPostNotifications) {
+                Log.w(
+                    TAG,
+                    "Cannot start OverlayService - notifications are disabled or POST_NOTIFICATIONS not granted"
+                )
+                return
+            }
             ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
         }
 
@@ -161,6 +169,15 @@ class OverlayService : Service() {
                     stopFromRequest()
                     return START_NOT_STICKY
                 }
+            }
+            val permissionStatus = PermissionValidator.checkPermissions(applicationContext, TAG)
+            if (!permissionStatus.canPostNotifications) {
+                Log.w(
+                    TAG,
+                    "Stopping service - unable to post notifications: ${permissionStatus.getDiagnosticMessage()}"
+                )
+                stopFromRequest()
+                return START_NOT_STICKY
             }
             startCollectors()
         } catch (e: Exception) {

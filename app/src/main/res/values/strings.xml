@@ -68,6 +68,7 @@
     <string name="onboarding_error_title">Permission Required</string>
     <string name="onboarding_error_message">AudioFocus requires all permissions to function. Please grant the permission to continue.</string>
     <string name="onboarding_retry">Retry</string>
+    <string name="post_notification_permission_required">AudioFocus must show a persistent notification to stay active. Please enable app notifications so the overlay can start automatically.</string>
     
     <!-- Settings loading -->
     <string name="settings_loading">Loading settings…</string>

@@ -1,12 +1,15 @@
 package com.polaralias.audiofocus.onboarding
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -38,6 +43,16 @@ class OnboardingActivity : ComponentActivity() {
     }
 
     private val viewModel: OnboardingViewModel by viewModels()
+    private val requestPostNotificationsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                Log.i(TAG, "POST_NOTIFICATIONS permission granted")
+                viewModel.onPermissionGranted()
+            } else {
+                Log.w(TAG, "POST_NOTIFICATIONS permission denied")
+                viewModel.onPostNotificationsPermissionDenied()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +65,8 @@ class OnboardingActivity : ComponentActivity() {
             setContent {
                 AudioFocusTheme {
                     val state by viewModel.uiState.collectAsState()
-                    
+                    var hasAutoRequestedPostNotifications by rememberSaveable { mutableStateOf(false) }
+
                     LaunchedEffect(state.isOnboardingComplete) {
                         if (state.isOnboardingComplete) {
                             Log.i(TAG, "Onboarding complete, navigating to SettingsActivity")
@@ -66,11 +82,33 @@ class OnboardingActivity : ComponentActivity() {
                             }
                         }
                     }
-                    
+
+                    LaunchedEffect(state.currentStep, state.canPostNotifications) {
+                        if (state.currentStep == OnboardingStep.NOTIFICATION) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                if (!state.canPostNotifications && !hasAutoRequestedPostNotifications) {
+                                    Log.d(TAG, "Auto-requesting POST_NOTIFICATIONS permission")
+                                    hasAutoRequestedPostNotifications = true
+                                    requestPostNotificationPermission()
+                                }
+                            }
+                        } else {
+                            hasAutoRequestedPostNotifications = false
+                        }
+                    }
+
                     OnboardingScreen(
                         state = state,
                         onRequestOverlay = { openOverlayPermission() },
-                        onRequestNotification = { openNotificationAccess() },
+                        onRequestNotification = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !state.canPostNotifications
+                            ) {
+                                requestPostNotificationPermission()
+                            } else {
+                                openNotificationAccess()
+                            }
+                        },
                         onRequestAccessibility = { openAccessibilitySettings() },
                         onComplete = { viewModel.completeOnboarding() },
                         onContinue = { viewModel.startWelcome() },
@@ -120,6 +158,17 @@ class OnboardingActivity : ComponentActivity() {
             Log.d(TAG, "Permission check initiated successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during onResume permission check", e)
+        }
+    }
+
+    private fun requestPostNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                requestPostNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                Log.d(TAG, "POST_NOTIFICATIONS permission request launched")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error requesting POST_NOTIFICATIONS permission", e)
+            }
         }
     }
 
@@ -179,14 +228,16 @@ private fun OnboardingScreen(
                 rationale = stringResource(R.string.onboarding_overlay_rationale),
                 isGranted = state.hasOverlayPermission,
                 showError = state.showError,
+                diagnostic = state.permissionDiagnostic,
                 onRequest = onRequestOverlay,
                 onRetry = onRetry
             )
             OnboardingStep.NOTIFICATION -> PermissionScreen(
                 title = stringResource(R.string.onboarding_notification_title),
                 rationale = stringResource(R.string.onboarding_notification_rationale),
-                isGranted = state.hasNotificationAccess,
+                isGranted = state.hasNotificationAccess && state.canPostNotifications,
                 showError = state.showError,
+                diagnostic = state.permissionDiagnostic,
                 onRequest = onRequestNotification,
                 onRetry = onRetry
             )
@@ -195,6 +246,7 @@ private fun OnboardingScreen(
                 rationale = stringResource(R.string.onboarding_accessibility_rationale),
                 isGranted = state.hasAccessibilityAccess,
                 showError = state.showError,
+                diagnostic = state.permissionDiagnostic,
                 onRequest = onRequestAccessibility,
                 onRetry = onRetry
             )
@@ -239,6 +291,7 @@ private fun PermissionScreen(
     rationale: String,
     isGranted: Boolean,
     showError: Boolean,
+    diagnostic: String,
     onRequest: () -> Unit,
     onRetry: () -> Unit
 ) {
@@ -271,7 +324,7 @@ private fun PermissionScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.onboarding_error_message),
+                text = if (diagnostic.isNotEmpty()) diagnostic else stringResource(R.string.onboarding_error_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center

@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.util.PermissionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     it.copy(
                         hasOverlayPermission = permissionStatus.hasOverlayPermission,
                         hasNotificationAccess = permissionStatus.hasNotificationAccess,
+                        canPostNotifications = permissionStatus.canPostNotifications,
                         hasAccessibilityAccess = permissionStatus.hasAccessibilityAccess,
                         permissionDiagnostic = permissionStatus.getDiagnosticMessage()
                     )
@@ -88,6 +90,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+    }
+
+    fun onPostNotificationsPermissionDenied() {
+        Log.w(TAG, "POST_NOTIFICATIONS permission denied by user")
+        val message = getApplication<Application>().getString(R.string.post_notification_permission_required)
+        _uiState.update { it.copy(permissionDiagnostic = message, canPostNotifications = false) }
     }
 
     fun setEnableYouTube(enabled: Boolean) {
