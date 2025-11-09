@@ -2,7 +2,6 @@ package com.polaralias.audiofocus.service
 
 import android.app.Notification
 import android.app.PendingIntent
-import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -19,6 +18,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.ViewTreeLifecycleOwner
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.media.MediaSessionMonitor
@@ -52,7 +53,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class OverlayService : Service() {
+class OverlayService : LifecycleService() {
     companion object {
         private const val TAG = "OverlayService"
         private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
@@ -548,6 +549,11 @@ class OverlayService : Service() {
             try {
                 Log.d(TAG, "Creating controls ComposeView")
                 val composeView = ComposeView(this).apply {
+                    // Compose requires a LifecycleOwner in the ViewTree for APIs like collectAsState.
+                    // When hosting a ComposeView from a Service there isn't one by default, so we
+                    // explicitly provide the service's lifecycle to avoid crashes when the overlay
+                    // UI starts observing Flows.
+                    ViewTreeLifecycleOwner.set(this, this@OverlayService)
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                     visibility = View.GONE // Start hidden
                     alpha = 0f
