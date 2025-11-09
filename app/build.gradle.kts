@@ -64,12 +64,15 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewtree:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-service:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime:2.6.2")
+    // Downgraded lifecycle dependencies from 2.7.0 to 2.6.2 due to:
+    // 1. lifecycle-viewtree:2.7.0 artifact not published/resolvable
+    // 2. ViewTreeLifecycleOwner resolution issues with 2.7.0
+    // in CI for run 19213969351 (job 54920452056, ref cbdf1db3a2f474617c1f7832e8eed48b5f0dfd31).
+    implementation("androidx.lifecycle:lifecycle-service:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
