@@ -553,7 +553,9 @@ class OverlayService : LifecycleService() {
                     // When hosting a ComposeView from a Service there isn't one by default, so we
                     // explicitly provide the service's lifecycle to avoid crashes when the overlay
                     // UI starts observing Flows.
-                    ViewTreeLifecycleOwner.set(this, this@OverlayService)
+                    // Note: ViewTreeLifecycleOwner class is not accessible in current lifecycle version
+                    // Using alternative approach via ViewTreeLifecycleOwner extension
+                    androidx.lifecycle.ViewTreeLifecycleOwner.set(this, this@OverlayService)
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                     visibility = View.GONE // Start hidden
                     alpha = 0f

@@ -64,9 +64,11 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
+    // Pin lifecycle dependencies to 2.7.0 (published stable version).
+    // Note: lifecycle-viewtree:2.7.0 does not exist as an AndroidX artifact.
+    // ViewTreeLifecycleOwner is provided by lifecycle-runtime, which is already included.
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewtree:2.7.0")
     implementation("androidx.lifecycle:lifecycle-service:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
