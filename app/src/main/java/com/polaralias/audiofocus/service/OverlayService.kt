@@ -18,8 +18,14 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
+import androidx.core.view.setViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.media.MediaSessionMonitor
@@ -100,6 +106,7 @@ class OverlayService : LifecycleService() {
 
     private var maskView: View? = null
     private var controlsView: ComposeView? = null
+    private var controlsSavedStateOwner: OverlaySavedStateOwner? = null
     private var currentOverlay: OverlayState = OverlayState.None
     private var commander: TransportCommander? = null
     private var isForeground = false
@@ -548,12 +555,13 @@ class OverlayService : LifecycleService() {
             // Create and attach controls view (initially hidden)
             try {
                 Log.d(TAG, "Creating controls ComposeView")
+                val savedStateOwner = OverlaySavedStateOwner(this)
                 val composeView = ComposeView(this).apply {
-                    // Compose requires a LifecycleOwner in the ViewTree for APIs like collectAsState.
-                    // When hosting a ComposeView from a Service there isn't one by default, so we
-                    // explicitly provide the service's lifecycle to avoid crashes when the overlay
-                    // UI starts observing Flows.
+                    // Compose requires both a LifecycleOwner and a SavedStateRegistryOwner in the
+                    // ViewTree when observing flows or using rememberSaveable. Services do not
+                    // provide these automatically, so we wire them manually.
                     setViewTreeLifecycleOwner(this@OverlayService)
+                    setViewTreeSavedStateRegistryOwner(savedStateOwner)
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                     visibility = View.GONE // Start hidden
                     alpha = 0f
@@ -569,12 +577,13 @@ class OverlayService : LifecycleService() {
                         }
                     }
                 }
-                
+
                 Log.d(TAG, "Creating controls layout parameters")
                 val controlsParams = OverlayLayoutFactory.controlsLayout()
                 Log.d(TAG, "Adding controls view to WindowManager")
                 windowManager.addView(composeView, controlsParams)
                 controlsView = composeView
+                controlsSavedStateOwner = savedStateOwner
                 Log.i(TAG, "Controls view attached successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error attaching controls view to WindowManager", e)
@@ -811,7 +820,12 @@ class OverlayService : LifecycleService() {
                 }
             }
             
-            controlsView?.let { 
+            controlsView?.let {
+                runCatching {
+                    it.setViewTreeSavedStateRegistryOwner(null)
+                }.onFailure { e ->
+                    Log.w(TAG, "Error clearing saved state owner from controls view", e)
+                }
                 runCatching {
                     Log.d(TAG, "Removing controls view from WindowManager")
                     // Ensure animations are cancelled before removal
@@ -825,9 +839,33 @@ class OverlayService : LifecycleService() {
         } catch (e: Exception) {
             Log.e(TAG, "Error during overlay removal", e)
         } finally {
+            controlsSavedStateOwner?.clear()
+            controlsSavedStateOwner = null
             maskView = null
             controlsView = null
             Log.d(TAG, "Overlay view references cleared")
+        }
+    }
+
+    private class OverlaySavedStateOwner(
+        private val lifecycleOwner: LifecycleOwner
+    ) : SavedStateRegistryOwner {
+
+        private val controller = SavedStateRegistryController.create(this)
+
+        init {
+            controller.performAttach()
+            controller.performRestore(null)
+        }
+
+        override val lifecycle: Lifecycle
+            get() = lifecycleOwner.lifecycle
+
+        override val savedStateRegistry: SavedStateRegistry
+            get() = controller.savedStateRegistry
+
+        fun clear() {
+            controller.performDetach()
         }
     }
 
