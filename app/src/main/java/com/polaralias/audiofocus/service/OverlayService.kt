@@ -229,7 +229,10 @@ class OverlayService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: action=${intent?.action}")
-        
+
+        // LifecycleService needs this call to dispatch ON_START to its lifecycle owner.
+        super.onStartCommand(intent, flags, startId)
+
         try {
             when (intent?.action) {
                 ACTION_TOGGLE_PLAYBACK -> {
