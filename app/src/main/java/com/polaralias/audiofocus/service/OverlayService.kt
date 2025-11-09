@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
 import com.polaralias.audiofocus.R
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.media.MediaSessionMonitor
@@ -553,7 +553,7 @@ class OverlayService : LifecycleService() {
                     // When hosting a ComposeView from a Service there isn't one by default, so we
                     // explicitly provide the service's lifecycle to avoid crashes when the overlay
                     // UI starts observing Flows.
-                    ViewTreeLifecycleOwner.set(this, this@OverlayService)
+                    setViewTreeLifecycleOwner(this@OverlayService)
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                     visibility = View.GONE // Start hidden
                     alpha = 0f
