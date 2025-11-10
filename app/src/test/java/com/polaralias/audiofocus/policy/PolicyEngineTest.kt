@@ -44,7 +44,7 @@ class PolicyEngineTest {
         )
 
         val result = PolicyEngine.compute(input)
-        assertEquals(OverlayState.Fullscreen(maskAlpha = prefs.dimAmount), result)
+        assertEquals(OverlayState.Fullscreen, result)
     }
 
     @Test
@@ -93,7 +93,7 @@ class PolicyEngineTest {
         )
 
         val result = PolicyEngine.compute(input)
-        assertEquals(OverlayState.Fullscreen(maskAlpha = prefs.dimAmount), result)
+        assertEquals(OverlayState.Fullscreen, result)
     }
 
     @Test
@@ -112,7 +112,7 @@ class PolicyEngineTest {
 
         val result = PolicyEngine.compute(input)
         assertEquals(
-            OverlayState.Partial(maskAlpha = prefs.dimAmount, heightRatio = 0.8f),
+            OverlayState.Partial(heightRatio = 0.8f),
             result
         )
     }

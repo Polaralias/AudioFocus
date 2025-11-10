@@ -27,7 +27,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -150,7 +149,6 @@ class SettingsActivity : ComponentActivity() {
                                 onToggleYouTube = viewModel::setEnableYouTube,
                                 onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
                                 onToggleStartOnBoot = viewModel::setStartOnBoot,
-                                onDimAmountChange = viewModel::setDimAmount,
                                 onRequestOverlay = { openOverlayPermission() },
                                 onRequestNotification = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -237,7 +235,6 @@ private fun SettingsScreen(
     onToggleYouTube: (Boolean) -> Unit,
     onToggleYouTubeMusic: (Boolean) -> Unit,
     onToggleStartOnBoot: (Boolean) -> Unit,
-    onDimAmountChange: (Float) -> Unit,
     onRequestOverlay: () -> Unit,
     onRequestNotification: () -> Unit,
     onRequestAccessibility: () -> Unit
@@ -357,24 +354,6 @@ private fun SettingsScreen(
                 checked = state.preferences.startOnBoot,
                 onToggle = onToggleStartOnBoot
             )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(id = R.string.dim_amount),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Slider(
-                    value = state.preferences.dimAmount,
-                    onValueChange = onDimAmountChange,
-                    valueRange = 0.2f..1f,
-                    steps = 7
-                )
-                Text(
-                    text = String.format("%.0f%%", state.preferences.dimAmount * 100f),
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
             PermissionRow(
                 title = stringResource(id = R.string.permission_overlay),
                 granted = state.hasOverlayPermission,

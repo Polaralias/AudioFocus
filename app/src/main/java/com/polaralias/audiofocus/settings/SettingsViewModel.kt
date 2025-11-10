@@ -42,7 +42,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         _uiState.update { it.copy(isLoading = false) }
                     }
                     .collectLatest { prefs ->
-                        Log.d(TAG, "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}, dimAmount=${prefs.dimAmount}")
+                        Log.d(
+                            TAG,
+                            "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}"
+                        )
                         _uiState.update { it.copy(preferences = prefs, isLoading = false) }
                         Log.d(TAG, "UI state updated with preferences, isLoading=false")
                     }
@@ -169,16 +172,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting start on boot to $enabled", e)
                 // Don't crash - just log the error
-            }
-        }
-    }
-
-    fun setDimAmount(alpha: Float) {
-        viewModelScope.launch {
-            try {
-                repository.setDimAmount(alpha)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error setting dim amount to $alpha", e)
             }
         }
     }

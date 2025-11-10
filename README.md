@@ -8,7 +8,7 @@ An Android application that provides media transport control overlays for YouTub
 - **Smart Detection**: Automatically detects when YouTube/YouTube Music videos are playing
 - **Accessibility Service**: Monitors window states to determine fullscreen/minimized modes
 - **Notification Integration**: Media session monitoring for playback state
-- **Customizable**: Configurable dim amount and per-app enable/disable
+- **Customizable**: Per-app enable/disable controls
 
 ## Requirements
 

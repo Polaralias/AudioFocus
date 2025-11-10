@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -21,7 +20,6 @@ class PreferencesRepository(private val context: Context) {
     private val enableYoutubeKey = booleanPreferencesKey("enable_youtube")
     private val enableYoutubeMusicKey = booleanPreferencesKey("enable_youtube_music")
     private val startOnBootKey = booleanPreferencesKey("start_on_boot")
-    private val dimAmountKey = floatPreferencesKey("dim_amount")
     private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
 
     val preferencesFlow: Flow<OverlayPreferences> = context.dataStore.data
@@ -39,7 +37,6 @@ class PreferencesRepository(private val context: Context) {
                 enableYouTube = prefs[enableYoutubeKey] ?: true,
                 enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
                 startOnBoot = prefs[startOnBootKey] ?: false,
-                dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
             )
         }
 
@@ -64,10 +61,6 @@ class PreferencesRepository(private val context: Context) {
         editPreference(startOnBootKey, enabled)
     }
 
-    suspend fun setDimAmount(alpha: Float) {
-        editPreference(dimAmountKey, alpha.coerceIn(0.2f, 1f))
-    }
-
     suspend fun setOnboardingCompleted(completed: Boolean) {
         editPreference(onboardingCompletedKey, completed)
     }
@@ -89,7 +82,6 @@ class PreferencesRepository(private val context: Context) {
                 enableYouTube = prefs[enableYoutubeKey] ?: true,
                 enableYouTubeMusic = prefs[enableYoutubeMusicKey] ?: true,
                 startOnBoot = prefs[startOnBootKey] ?: false,
-                dimAmount = prefs[dimAmountKey]?.coerceIn(0.2f, 1f) ?: 0.9f
             )
         } catch (e: IOException) {
             Log.e(TAG, "Error reading current preferences, using defaults", e)
