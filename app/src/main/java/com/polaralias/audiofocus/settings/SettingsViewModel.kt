@@ -10,6 +10,7 @@ import com.polaralias.audiofocus.service.MediaNotificationListener
 import com.polaralias.audiofocus.service.OverlayServiceStatusTracker
 import com.polaralias.audiofocus.service.ServiceDiagnostics
 import com.polaralias.audiofocus.util.PermissionValidator
+import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     private val repository = PreferencesRepository(application)
+    private val defaultOverlayColor = repository.defaultOverlayColor
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
@@ -43,13 +45,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     }
                     .collectLatest { prefs ->
                         Log.d(TAG, "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}, dimAmount=${prefs.dimAmount}")
-                        _uiState.update { it.copy(preferences = prefs, isLoading = false) }
+                        _uiState.update {
+                            it.copy(
+                                preferences = prefs,
+                                defaultOverlayColor = defaultOverlayColor,
+                                isLoading = false
+                            )
+                        }
                         Log.d(TAG, "UI state updated with preferences, isLoading=false")
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Fatal error in preferences collection", e)
                 // Update state with defaults and mark as not loading to keep UI responsive
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update {
+                    it.copy(
+                        defaultOverlayColor = defaultOverlayColor,
+                        isLoading = false
+                    )
+                }
             }
         }
 
@@ -179,6 +192,50 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 repository.setDimAmount(alpha)
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting dim amount to $alpha", e)
+            }
+        }
+    }
+
+    fun useDefaultOverlayColor() {
+        Log.i(TAG, "User requested default overlay color")
+        viewModelScope.launch {
+            try {
+                repository.setOverlaySolidColor(defaultOverlayColor)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error applying default overlay color", e)
+            }
+        }
+    }
+
+    fun setCustomOverlayColor(color: Int) {
+        Log.i(TAG, "User selected custom overlay color: $color")
+        viewModelScope.launch {
+            try {
+                repository.setOverlaySolidColor(color)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting custom overlay color to $color", e)
+            }
+        }
+    }
+
+    fun setOverlayImage(uri: Uri) {
+        Log.i(TAG, "User selected overlay image: $uri")
+        viewModelScope.launch {
+            try {
+                repository.setOverlayImage(uri)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error persisting overlay image uri: $uri", e)
+            }
+        }
+    }
+
+    fun clearOverlayImage() {
+        Log.i(TAG, "User cleared overlay image selection")
+        viewModelScope.launch {
+            try {
+                repository.clearOverlayImage()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing overlay image", e)
             }
         }
     }

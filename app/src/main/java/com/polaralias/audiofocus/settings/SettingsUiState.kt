@@ -1,11 +1,13 @@
 package com.polaralias.audiofocus.settings
 
 import com.polaralias.audiofocus.data.OverlayPreferences
+import com.polaralias.audiofocus.data.OverlayPreferencesDefaults
 import com.polaralias.audiofocus.service.OverlayServiceState
 import com.polaralias.audiofocus.service.OverlayServiceStatus
 
 data class SettingsUiState(
     val preferences: OverlayPreferences = OverlayPreferences(),
+    val defaultOverlayColor: Int = OverlayPreferencesDefaults.DEFAULT_OVERLAY_COLOR,
     val hasOverlayPermission: Boolean = false,
     val hasNotificationAccess: Boolean = false,
     val canPostNotifications: Boolean = false,

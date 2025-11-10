@@ -9,9 +9,13 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,32 +26,45 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import com.polaralias.audiofocus.R
+import com.polaralias.audiofocus.data.OverlayFillMode
 import com.polaralias.audiofocus.service.OverlayService
 import com.polaralias.audiofocus.service.OverlayServiceState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 class SettingsActivity : ComponentActivity() {
     companion object {
@@ -145,12 +162,54 @@ class SettingsActivity : ComponentActivity() {
                                 }
                             }
                             
+                            val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                                if (uri != null) {
+                                    try {
+                                        Log.d(TAG, "Persisting read permission for overlay image: $uri")
+                                        activity.contentResolver.takePersistableUriPermission(
+                                            uri,
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                        )
+                                    } catch (e: SecurityException) {
+                                        Log.w(TAG, "Unable to persist read permission for $uri", e)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Unexpected error persisting URI permission for $uri", e)
+                                    }
+
+                                    state.preferences.overlayImageUri?.let { previousUri ->
+                                        if (previousUri != uri) {
+                                            activity.releasePersistablePermission(previousUri)
+                                        }
+                                    }
+
+                                    viewModel.setOverlayImage(uri)
+                                } else {
+                                    Log.d(TAG, "Overlay image picker returned null URI")
+                                }
+                            }
+
                             SettingsScreen(
                                 state = state,
                                 onToggleYouTube = viewModel::setEnableYouTube,
                                 onToggleYouTubeMusic = viewModel::setEnableYouTubeMusic,
                                 onToggleStartOnBoot = viewModel::setStartOnBoot,
                                 onDimAmountChange = viewModel::setDimAmount,
+                                onUseDefaultOverlayColor = viewModel::useDefaultOverlayColor,
+                                onPickCustomOverlayColor = viewModel::setCustomOverlayColor,
+                                onSelectOverlayImage = {
+                                    try {
+                                        imagePickerLauncher.launch(arrayOf("image/*"))
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error launching overlay image picker", e)
+                                    }
+                                },
+                                onClearOverlayImage = {
+                                    val currentImage = state.preferences.overlayImageUri
+                                    if (currentImage != null) {
+                                        activity.releasePersistablePermission(currentImage)
+                                    }
+                                    viewModel.clearOverlayImage()
+                                },
                                 onRequestOverlay = { openOverlayPermission() },
                                 onRequestNotification = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -229,6 +288,21 @@ class SettingsActivity : ComponentActivity() {
             Log.e(TAG, "Error opening accessibility settings", e)
         }
     }
+
+    private fun releasePersistablePermission(uri: Uri) {
+        try {
+            val resolver = contentResolver
+            val persisted = resolver.persistedUriPermissions.firstOrNull { it.uri == uri }
+            if (persisted != null) {
+                Log.d(TAG, "Releasing persisted permission for overlay image: $uri")
+                resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Unable to release persisted permission for $uri", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error releasing persisted permission for $uri", e)
+        }
+    }
 }
 
 @Composable
@@ -238,6 +312,10 @@ private fun SettingsScreen(
     onToggleYouTubeMusic: (Boolean) -> Unit,
     onToggleStartOnBoot: (Boolean) -> Unit,
     onDimAmountChange: (Float) -> Unit,
+    onUseDefaultOverlayColor: () -> Unit,
+    onPickCustomOverlayColor: (Int) -> Unit,
+    onSelectOverlayImage: () -> Unit,
+    onClearOverlayImage: () -> Unit,
     onRequestOverlay: () -> Unit,
     onRequestNotification: () -> Unit,
     onRequestAccessibility: () -> Unit
@@ -375,6 +453,18 @@ private fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
+
+            OverlayAppearanceSection(
+                fillMode = state.preferences.overlayFillMode,
+                currentColor = state.preferences.overlayColor,
+                defaultColor = state.defaultOverlayColor,
+                imageUri = state.preferences.overlayImageUri,
+                onUseDefaultOverlayColor = onUseDefaultOverlayColor,
+                onPickCustomOverlayColor = onPickCustomOverlayColor,
+                onSelectOverlayImage = onSelectOverlayImage,
+                onClearOverlayImage = onClearOverlayImage
+            )
+
             PermissionRow(
                 title = stringResource(id = R.string.permission_overlay),
                 granted = state.hasOverlayPermission,
@@ -438,6 +528,243 @@ private fun PermissionRow(title: String, granted: Boolean, onClick: () -> Unit) 
         Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
             Text(text = title)
         }
+    }
+}
+
+@Composable
+private fun OverlayAppearanceSection(
+    fillMode: OverlayFillMode,
+    currentColor: Int,
+    defaultColor: Int,
+    imageUri: Uri?,
+    onUseDefaultOverlayColor: () -> Unit,
+    onPickCustomOverlayColor: (Int) -> Unit,
+    onSelectOverlayImage: () -> Unit,
+    onClearOverlayImage: () -> Unit
+) {
+    var showColorPicker by remember { mutableStateOf(false) }
+    val colorHex = remember(currentColor) { String.format("#%08X", currentColor) }
+    val defaultHex = remember(defaultColor) { String.format("#%08X", defaultColor) }
+
+    if (showColorPicker) {
+        ColorPickerDialog(
+            initialColor = Color(currentColor),
+            onDismiss = { showColorPicker = false },
+            onColorSelected = { selected ->
+                onPickCustomOverlayColor(selected.toArgb())
+                showColorPicker = false
+            }
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = stringResource(id = R.string.overlay_fill_section_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            ) {
+                if (fillMode == OverlayFillMode.IMAGE && imageUri != null) {
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription = stringResource(id = R.string.overlay_fill_preview_content_description),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(currentColor))
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val modeLabel = when (fillMode) {
+                    OverlayFillMode.IMAGE -> stringResource(id = R.string.overlay_fill_mode_image)
+                    OverlayFillMode.SOLID_COLOR -> stringResource(id = R.string.overlay_fill_mode_solid)
+                }
+                Text(
+                    text = modeLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = androidx.compose.ui.res.stringResource(
+                        id = R.string.overlay_fill_current_color,
+                        colorHex
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+                if (fillMode == OverlayFillMode.IMAGE && imageUri == null) {
+                    Text(
+                        text = stringResource(id = R.string.overlay_fill_image_missing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = androidx.compose.ui.res.stringResource(
+                id = R.string.overlay_fill_default_color,
+                defaultHex
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+
+        Button(
+            onClick = onUseDefaultOverlayColor,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = stringResource(id = R.string.overlay_fill_use_default))
+        }
+        Button(
+            onClick = { showColorPicker = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = stringResource(id = R.string.overlay_fill_pick_custom))
+        }
+        Button(
+            onClick = onSelectOverlayImage,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = stringResource(id = R.string.overlay_fill_select_image))
+        }
+        if (imageUri != null) {
+            OutlinedButton(
+                onClick = onClearOverlayImage,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = stringResource(id = R.string.overlay_fill_remove_image))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColorPickerDialog(
+    initialColor: Color,
+    onDismiss: () -> Unit,
+    onColorSelected: (Color) -> Unit
+) {
+    var alpha by remember(initialColor) { mutableFloatStateOf(initialColor.alpha * 255f) }
+    var red by remember(initialColor) { mutableFloatStateOf(initialColor.red * 255f) }
+    var green by remember(initialColor) { mutableFloatStateOf(initialColor.green * 255f) }
+    var blue by remember(initialColor) { mutableFloatStateOf(initialColor.blue * 255f) }
+
+    val previewColor = Color(
+        alpha = (alpha / 255f).coerceIn(0f, 1f),
+        red = (red / 255f).coerceIn(0f, 1f),
+        green = (green / 255f).coerceIn(0f, 1f),
+        blue = (blue / 255f).coerceIn(0f, 1f)
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onColorSelected(previewColor) }) {
+                Text(text = stringResource(id = R.string.color_picker_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(id = R.string.color_picker_cancel))
+            }
+        },
+        title = { Text(text = stringResource(id = R.string.color_picker_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(previewColor)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                )
+                ColorSliderRow(
+                    label = stringResource(id = R.string.color_picker_alpha),
+                    value = alpha,
+                    onValueChange = { alpha = it }
+                )
+                ColorSliderRow(
+                    label = stringResource(id = R.string.color_picker_red),
+                    value = red,
+                    onValueChange = { red = it }
+                )
+                ColorSliderRow(
+                    label = stringResource(id = R.string.color_picker_green),
+                    value = green,
+                    onValueChange = { green = it }
+                )
+                ColorSliderRow(
+                    label = stringResource(id = R.string.color_picker_blue),
+                    value = blue,
+                    onValueChange = { blue = it }
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun ColorSliderRow(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = value.roundToInt().toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+        Slider(
+            value = value.coerceIn(0f, 255f),
+            onValueChange = { onValueChange(it.coerceIn(0f, 255f)) },
+            valueRange = 0f..255f
+        )
     }
 }
 

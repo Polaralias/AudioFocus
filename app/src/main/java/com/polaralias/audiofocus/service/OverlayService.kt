@@ -5,6 +5,9 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.net.Uri
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
@@ -12,12 +15,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -27,6 +32,8 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import com.polaralias.audiofocus.R
+import com.polaralias.audiofocus.data.OverlayFillMode
+import com.polaralias.audiofocus.data.OverlayPreferences
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.media.MediaSessionMonitor
 import com.polaralias.audiofocus.model.MediaState
@@ -42,7 +49,6 @@ import com.polaralias.audiofocus.policy.PolicyInput
 import com.polaralias.audiofocus.ui.controls.ControlsOverlay
 import com.polaralias.audiofocus.ui.controls.ControlsUiState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
-import com.polaralias.audiofocus.ui.theme.audioFocusColorScheme
 import com.polaralias.audiofocus.util.PermissionValidator
 import com.polaralias.audiofocus.window.WindowInfo
 import kotlinx.coroutines.CoroutineScope
@@ -52,12 +58,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 class OverlayService : LifecycleService() {
     companion object {
@@ -104,7 +113,7 @@ class OverlayService : LifecycleService() {
     private lateinit var mediaMonitor: MediaSessionMonitor
     private lateinit var preferences: PreferencesRepository
 
-    private var maskView: View? = null
+    private var maskView: FrameLayout? = null
     private var controlsView: ComposeView? = null
     private var controlsSavedStateOwner: OverlaySavedStateOwner? = null
     private var currentOverlay: OverlayState = OverlayState.None
@@ -124,6 +133,11 @@ class OverlayService : LifecycleService() {
     private var debounceJob: Job? = null
     private var lastVisibleState: OverlayState = OverlayState.None
     private var lastVisibleTimestamp: Long = 0L
+    private var latestPreferences: OverlayPreferences = OverlayPreferences()
+    private var maskImageView: ImageView? = null
+    private var maskImageLoadJob: Job? = null
+    private var lastLoadedImageUri: Uri? = null
+    private var lastMaskAlpha: Float = 1f
 
     override fun onCreate() {
         super.onCreate()
@@ -147,6 +161,7 @@ class OverlayService : LifecycleService() {
 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             preferences = PreferencesRepository(applicationContext)
+            latestPreferences = OverlayPreferences(overlayColor = preferences.defaultOverlayColor)
             mediaMonitor = MediaSessionMonitor(this, scope)
             
             Log.d(TAG, "Building foreground notification")
@@ -315,7 +330,7 @@ class OverlayService : LifecycleService() {
                         AccessWindowsService.windowInfo,
                         preferences.preferencesFlow.catch { e ->
                             Log.e(TAG, "Error reading preferences in collector, using defaults", e)
-                            emit(com.polaralias.audiofocus.data.OverlayPreferences())
+                            emit(OverlayPreferences(overlayColor = preferences.defaultOverlayColor))
                         }
                     ) { media, windowInfo, prefs ->
                         val playback = when (media) {
@@ -337,7 +352,7 @@ class OverlayService : LifecycleService() {
                                 preferences = prefs
                             )
                         )
-                        OverlayRenderState(media, overlay)
+                        OverlayRenderState(media, overlay, prefs)
                     }.collectLatest { renderState ->
                         applyRenderState(renderState)
                     }
@@ -359,6 +374,9 @@ class OverlayService : LifecycleService() {
     }
 
     private fun applyRenderState(renderState: OverlayRenderState) {
+        latestPreferences = renderState.preferences
+        refreshMaskAppearance(renderState.overlayState)
+
         updateCommander(renderState.mediaState)
         updateControls(renderState.mediaState, renderState.overlayState)
 
@@ -425,13 +443,13 @@ class OverlayService : LifecycleService() {
      */
     private fun applyOverlayStateImmediate(state: OverlayState, isPlaying: Boolean) {
         Log.d(TAG, "Applying overlay state: $state (isPlaying=$isPlaying)")
-        
+
         when (state) {
             OverlayState.None -> setOverlayVisibility(visible = false, isPlaying)
             else -> {
-                updateMaskForState(state)
+                updateMaskForState(state, latestPreferences)
                 setOverlayVisibility(visible = true, isPlaying)
-                
+
                 // Track when overlay became visible for grace period
                 if (lastVisibleState is OverlayState.None) {
                     lastVisibleTimestamp = System.currentTimeMillis()
@@ -439,7 +457,7 @@ class OverlayService : LifecycleService() {
                 lastVisibleState = state
             }
         }
-        
+
         currentOverlay = state
         
         // Update notification
@@ -448,6 +466,16 @@ class OverlayService : LifecycleService() {
         if (!isForeground) {
             isForeground = true
         }
+    }
+
+    private fun refreshMaskAppearance(pendingState: OverlayState) {
+        val mask = maskView ?: return
+        val stateToUse = when {
+            pendingState !is OverlayState.None -> pendingState
+            currentOverlay !is OverlayState.None -> currentOverlay
+            else -> OverlayState.None
+        }
+        updateMaskForState(stateToUse, latestPreferences)
     }
 
     private fun updateCommander(mediaState: MediaState) {
@@ -533,6 +561,7 @@ class OverlayService : LifecycleService() {
                 )
                 visibility = View.GONE // Start hidden
                 alpha = 0f
+                setBackgroundColor(applyMaskAlpha(latestPreferences.overlayColor, lastMaskAlpha))
             }
             
             // Use Fullscreen state for initial layout params (will be updated later based on actual state)
@@ -602,45 +631,158 @@ class OverlayService : LifecycleService() {
      * Update mask view layout parameters and appearance for the given overlay state.
      * This updates the existing attached view rather than recreating it.
      */
-    private fun updateMaskForState(state: OverlayState) {
-        val mask = maskView as? FrameLayout ?: run {
+    private fun updateMaskForState(state: OverlayState, preferences: OverlayPreferences) {
+        val mask = maskView ?: run {
             Log.w(TAG, "Mask view not attached, cannot update")
             return
         }
-        
+
         try {
-            Log.d(TAG, "Updating mask for state: $state")
-            
-            // Update layout parameters if state changed
-            try {
-                val params = OverlayLayoutFactory.maskLayoutFor(this, state)
-                if (params != null) {
-                    windowManager.updateViewLayout(mask, params)
-                    Log.d(TAG, "Mask layout parameters updated successfully")
-                } else {
-                    Log.w(TAG, "Failed to get layout parameters for state: $state")
+            Log.d(TAG, "Updating mask for state: $state with fill mode=${preferences.overlayFillMode}")
+
+            if (state !is OverlayState.None) {
+                try {
+                    val params = OverlayLayoutFactory.maskLayoutFor(this, state)
+                    if (params != null) {
+                        windowManager.updateViewLayout(mask, params)
+                        Log.d(TAG, "Mask layout parameters updated successfully")
+                    } else {
+                        Log.w(TAG, "Failed to get layout parameters for state: $state")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating mask layout parameters", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating mask layout parameters", e)
             }
-            
-            // Update background color based on mask alpha
-            try {
-                val alpha = when (state) {
-                    is OverlayState.Fullscreen -> state.maskAlpha
-                    is OverlayState.Partial -> state.maskAlpha
-                    OverlayState.None -> 0f
-                }
-                mask.setBackgroundColor(maskColor(alpha))
-                Log.d(TAG, "Mask background color updated with alpha: $alpha")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating mask background color", e)
-            }
-            
+
+            val maskAlpha = state.maskAlphaOr(lastMaskAlpha)
+            applyMaskFill(mask, preferences, maskAlpha)
+
             Log.d(TAG, "Mask view updated successfully for state: $state")
         } catch (e: Exception) {
             Log.e(TAG, "Error updating mask for state: $state", e)
         }
+    }
+
+    private fun OverlayState.maskAlphaOr(defaultValue: Float): Float = when (this) {
+        is OverlayState.Fullscreen -> maskAlpha
+        is OverlayState.Partial -> maskAlpha
+        OverlayState.None -> defaultValue
+    }
+
+    private fun applyMaskFill(
+        container: FrameLayout,
+        preferences: OverlayPreferences,
+        maskAlpha: Float
+    ) {
+        lastMaskAlpha = maskAlpha
+        when (preferences.overlayFillMode) {
+            OverlayFillMode.IMAGE -> {
+                val uri = preferences.overlayImageUri
+                if (uri != null) {
+                    loadMaskImage(container, uri, preferences, maskAlpha)
+                } else {
+                    Log.d(TAG, "No overlay image set; falling back to solid color")
+                    clearMaskImage(container)
+                    container.setBackgroundColor(applyMaskAlpha(preferences.overlayColor, maskAlpha))
+                }
+            }
+
+            OverlayFillMode.SOLID_COLOR -> {
+                clearMaskImage(container)
+                container.setBackgroundColor(applyMaskAlpha(preferences.overlayColor, maskAlpha))
+            }
+        }
+    }
+
+    private fun loadMaskImage(
+        container: FrameLayout,
+        uri: Uri,
+        preferences: OverlayPreferences,
+        maskAlpha: Float
+    ) {
+        container.setBackgroundColor(Color.TRANSPARENT)
+        val imageView = ensureMaskImageView(container)
+        val alphaInt = (maskAlpha * 255f).roundToInt().coerceIn(0, 255)
+        imageView.imageAlpha = alphaInt
+
+        if (uri == lastLoadedImageUri && imageView.drawable != null) {
+            Log.d(TAG, "Reusing previously loaded overlay image: $uri")
+            return
+        }
+
+        maskImageLoadJob?.cancel()
+        imageView.setImageDrawable(null)
+
+        maskImageLoadJob = scope.launch {
+            val bitmap = withContext(Dispatchers.IO) {
+                try {
+                    contentResolver.openInputStream(uri)?.use { stream ->
+                        BitmapFactory.decodeStream(stream)
+                    }
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "Unable to read persisted overlay image at $uri", e)
+                    null
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error decoding overlay image at $uri", e)
+                    null
+                }
+            }
+
+            if (!isActive) {
+                bitmap?.recycle()
+                return@launch
+            }
+
+            if (bitmap != null) {
+                lastLoadedImageUri = uri
+                imageView.setImageBitmap(bitmap)
+                imageView.imageAlpha = alphaInt
+                Log.d(TAG, "Overlay image loaded successfully for $uri")
+            } else {
+                Log.w(TAG, "Falling back to solid color after image load failure")
+                lastLoadedImageUri = null
+                clearMaskImage(container)
+                container.setBackgroundColor(applyMaskAlpha(preferences.overlayColor, maskAlpha))
+            }
+        }
+    }
+
+    private fun ensureMaskImageView(container: FrameLayout): ImageView {
+        val existing = maskImageView
+        if (existing != null && existing.parent === container) {
+            return existing
+        }
+
+        if (existing != null && existing.parent !== container) {
+            clearMaskImage()
+        }
+
+        val imageView = AppCompatImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+        container.addView(imageView, 0)
+        maskImageView = imageView
+        return imageView
+    }
+
+    private fun clearMaskImage(container: FrameLayout? = maskView) {
+        maskImageLoadJob?.cancel()
+        maskImageLoadJob = null
+        lastLoadedImageUri = null
+
+        val imageView = maskImageView ?: return
+        try {
+            imageView.setImageDrawable(null)
+            val parent = container ?: (imageView.parent as? FrameLayout)
+            parent?.removeView(imageView)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error removing mask image view", e)
+        }
+        maskImageView = null
     }
     
     /**
@@ -808,7 +950,8 @@ class OverlayService : LifecycleService() {
     private fun removeOverlays() {
         Log.i(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
         try {
-            maskView?.let { 
+            clearMaskImage()
+            maskView?.let {
                 runCatching {
                     Log.d(TAG, "Removing mask view from WindowManager")
                     // Ensure animations are cancelled before removal
@@ -890,13 +1033,14 @@ class OverlayService : LifecycleService() {
 
     private data class OverlayRenderState(
         val mediaState: MediaState,
-        val overlayState: OverlayState
+        val overlayState: OverlayState,
+        val preferences: OverlayPreferences
     )
 }
 
-private fun OverlayService.maskColor(alpha: Float): Int {
-    val scheme = audioFocusColorScheme(this)
-    val scrim = scheme.scrim
-    val resolvedAlpha = (scrim.alpha * alpha).coerceIn(0f, 1f)
-    return scrim.copy(alpha = resolvedAlpha).toArgb()
+private fun applyMaskAlpha(colorInt: Int, maskAlpha: Float): Int {
+    val baseAlpha = Color.alpha(colorInt) / 255f
+    val resolvedAlpha = (baseAlpha * maskAlpha).coerceIn(0f, 1f)
+    val alphaComponent = (resolvedAlpha * 255f).roundToInt().coerceIn(0, 255)
+    return ColorUtils.setAlphaComponent(colorInt, alphaComponent)
 }
