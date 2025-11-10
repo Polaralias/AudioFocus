@@ -76,7 +76,8 @@ class WindowHeuristics(context: Context) {
         window: AccessibilityWindowInfo,
         coverage: Float,
     ): WindowState {
-        if (window.type == AccessibilityWindowInfo.TYPE_PINNED) {
+        // TYPE_PINNED (value 4) was added in API 26 for Picture-in-Picture windows
+        if (window.type == 4) {
             return WindowState.PICTURE_IN_PICTURE
         }
         if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
