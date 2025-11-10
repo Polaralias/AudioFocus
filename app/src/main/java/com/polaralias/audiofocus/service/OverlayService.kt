@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
-import androidx.core.view.setViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
@@ -865,7 +865,10 @@ class OverlayService : LifecycleService() {
             get() = controller.savedStateRegistry
 
         fun clear() {
-            controller.performDetach()
+            // Note: performDetach() is only available in savedstate 1.3.0+
+            // For 1.2.1, we don't need to explicitly detach as the controller
+            // will be garbage collected along with the owner
+            // controller.performDetach()
         }
     }
 
