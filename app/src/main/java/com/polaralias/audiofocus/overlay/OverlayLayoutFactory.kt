@@ -20,21 +20,22 @@ object OverlayLayoutFactory {
                 Log.d(TAG, "Creating fullscreen mask layout")
                 createMaskLayout(
                     context,
-                    height = WindowManager.LayoutParams.MATCH_PARENT
+                    height = WindowManager.LayoutParams.MATCH_PARENT,
+                    gravity = Gravity.TOP
                 )
             }
             is OverlayState.Partial -> {
                 val displayHeight = context.resources.displayMetrics.heightPixels
                 val height = (displayHeight * state.heightRatio).toInt()
                 Log.d(TAG, "Creating partial mask layout: heightRatio=${state.heightRatio}, height=$height px")
-                createMaskLayout(context, height = height)
+                createMaskLayout(context, height = height, gravity = Gravity.BOTTOM)
             }
         }
     }
 
     // Creates mask layout with FLAG_NOT_TOUCHABLE for full touch passthrough
     // This ensures the overlay doesn't intercept any touch events
-    private fun createMaskLayout(context: Context, height: Int): WindowManager.LayoutParams {
+    private fun createMaskLayout(context: Context, height: Int, gravity: Int): WindowManager.LayoutParams {
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             height,
@@ -44,7 +45,7 @@ object OverlayLayoutFactory {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP
+            this.gravity = gravity
         }
     }
 

@@ -41,7 +41,10 @@ class AccessWindowsService : AccessibilityService() {
         try {
             val info = heuristics.evaluate(windows?.toList(), resources.displayMetrics)
             _windowInfo.value = info
-            Log.d(TAG, "Window info published: hasVideoSurface=${info.hasLikelyVideoSurface}, isFullscreen=${info.isFullscreen}")
+            Log.d(
+                TAG,
+                "Window info published: focused=${info.focusedPackage}, entries=${info.appWindows}"
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error publishing window info", e)
         }
