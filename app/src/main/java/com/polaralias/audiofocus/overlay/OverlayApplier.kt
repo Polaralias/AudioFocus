@@ -1,0 +1,75 @@
+package com.polaralias.audiofocus.overlay
+
+import android.content.Context
+import android.content.res.Resources
+import android.graphics.PixelFormat
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.FrameLayout
+
+class OverlayApplier(
+    private val context: Context,
+    private val overlayViewFactory: () -> View = { defaultOverlayView(context) }
+) {
+    private val wm: WindowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private var overlayView: View? = null
+    private var attached = false
+
+    fun showFullScreenOverlay() {
+        val lp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        attachOrUpdate(lp)
+    }
+
+    fun showPartialOverlayBottom80PassThrough() {
+        val dm = Resources.getSystem().displayMetrics
+        val height = (dm.heightPixels * 0.8f).toInt()
+        val lp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            height,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        attachOrUpdate(lp)
+    }
+
+    fun hideOverlay() {
+        overlayView?.let { v ->
+            if (attached) {
+                try { wm.removeViewImmediate(v) } catch (_: Throwable) {}
+                attached = false
+            }
+        }
+    }
+
+    private fun attachOrUpdate(lp: WindowManager.LayoutParams) {
+        val view = overlayView ?: overlayViewFactory().also { overlayView = it }
+        if (attached) {
+            wm.updateViewLayout(view, lp)
+        } else {
+            wm.addView(view, lp)
+            attached = true
+        }
+    }
+
+    companion object {
+        private fun defaultOverlayView(context: Context): View =
+            FrameLayout(context).apply { setBackgroundColor(0x33000000) }
+    }
+}
