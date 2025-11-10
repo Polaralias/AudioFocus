@@ -13,20 +13,97 @@ class WindowHeuristics(context: Context) {
 
     fun evaluate(windows: List<AccessibilityWindowInfo>?, metrics: DisplayMetrics): WindowInfo {
         if (windows.isNullOrEmpty()) return WindowInfo.Empty
-        val ytWindow = windows.firstOrNull {
-            it.root?.packageName == YOUTUBE_MUSIC
-        } ?: return WindowInfo.Empty
-        val bounds = Rect()
-        ytWindow.getBoundsInScreen(bounds)
-        val isFullscreen = bounds.height() >= metrics.heightPixels * FULLSCREEN_THRESHOLD &&
-            bounds.width() >= metrics.widthPixels * FULLSCREEN_THRESHOLD
-        val root = ytWindow.root ?: return WindowInfo(isFullscreen, isFullscreen)
-        val hasSurface = try {
-            findVideoSurface(root)
-        } finally {
-            root.recycle()
+
+        val bestByPackage = mutableMapOf<String, WindowCandidate>()
+        var focusedPackage: String? = null
+
+        windows.forEach { window ->
+            val root = window.root ?: return@forEach
+            try {
+                val packageName = root.packageName?.toString()
+                if (packageName.isNullOrEmpty()) {
+                    return@forEach
+                }
+
+                if (window.isActive && focusedPackage == null) {
+                    focusedPackage = packageName
+                }
+
+                if (packageName !in SUPPORTED_PACKAGES) {
+                    return@forEach
+                }
+
+                val bounds = Rect().also(window::getBoundsInScreen)
+                val coverage = coverage(bounds, metrics)
+                val state = determineWindowState(window, coverage)
+
+                val hasVideoSurface = when {
+                    state == WindowState.BACKGROUND -> false
+                    packageName == YOUTUBE_MUSIC ->
+                        state == WindowState.FULLSCREEN || hasLikelyVideoSurface(root)
+                    else -> true
+                }
+
+                val candidate = WindowCandidate(
+                    info = AppWindowInfo(
+                        packageName = packageName,
+                        state = state,
+                        hasVisibleVideoSurface = hasVideoSurface,
+                    ),
+                    coverage = coverage,
+                )
+
+                val existing = bestByPackage[packageName]
+                if (existing == null || candidate.isBetterThan(existing)) {
+                    bestByPackage[packageName] = candidate
+                }
+            } finally {
+                root.recycle()
+            }
         }
-        return WindowInfo(isFullscreen = isFullscreen, hasLikelyVideoSurface = hasSurface || isFullscreen)
+
+        if (bestByPackage.isEmpty()) {
+            return WindowInfo.Empty
+        }
+
+        return WindowInfo(
+            focusedPackage = focusedPackage,
+            appWindows = bestByPackage.mapValues { it.value.info },
+        )
+    }
+
+    private fun determineWindowState(
+        window: AccessibilityWindowInfo,
+        coverage: Float,
+    ): WindowState {
+        if (window.type == AccessibilityWindowInfo.TYPE_PINNED) {
+            return WindowState.PICTURE_IN_PICTURE
+        }
+        if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
+            return WindowState.BACKGROUND
+        }
+        if (coverage <= PIP_COVERAGE_THRESHOLD) {
+            return WindowState.PICTURE_IN_PICTURE
+        }
+        return if (coverage >= FULLSCREEN_COVERAGE_THRESHOLD) {
+            WindowState.FULLSCREEN
+        } else {
+            WindowState.MINIMIZED_IN_APP
+        }
+    }
+
+    private fun coverage(bounds: Rect, metrics: DisplayMetrics): Float {
+        val screenArea = (metrics.widthPixels * metrics.heightPixels).coerceAtLeast(1)
+        val width = bounds.width().coerceAtLeast(0)
+        val height = bounds.height().coerceAtLeast(0)
+        val windowArea = width * height
+        return if (windowArea == 0) 0f else windowArea.toFloat() / screenArea.toFloat()
+    }
+
+    private fun hasLikelyVideoSurface(root: AccessibilityNodeInfo): Boolean {
+        if (findVideoSurface(root)) return true
+        // Fullscreen windows occasionally fail the heuristics due to obfuscated class names.
+        return false
     }
 
     private fun findVideoSurface(node: AccessibilityNodeInfo): Boolean {
@@ -75,13 +152,40 @@ class WindowHeuristics(context: Context) {
         return result
     }
 
+    private data class WindowCandidate(
+        val info: AppWindowInfo,
+        val coverage: Float,
+    ) {
+        fun isBetterThan(other: WindowCandidate): Boolean {
+            val thisPriority = STATE_PRIORITY[info.state] ?: 0
+            val otherPriority = STATE_PRIORITY[other.info.state] ?: 0
+            return when {
+                thisPriority > otherPriority -> true
+                thisPriority < otherPriority -> false
+                else -> coverage > other.coverage
+            }
+        }
+    }
+
     data class VideoHeuristics(
         val surfaceClasses: List<String>,
         val keywords: List<String>
     )
 
     companion object {
+        private const val YOUTUBE = "com.google.android.youtube"
         private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
-        private const val FULLSCREEN_THRESHOLD = 0.96f
+        private val SUPPORTED_PACKAGES = setOf(YOUTUBE, YOUTUBE_MUSIC)
+
+        private const val FULLSCREEN_COVERAGE_THRESHOLD = 0.75f
+        private const val PIP_COVERAGE_THRESHOLD = 0.12f
+        private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
+
+        private val STATE_PRIORITY = mapOf(
+            WindowState.FULLSCREEN to 3,
+            WindowState.MINIMIZED_IN_APP to 2,
+            WindowState.PICTURE_IN_PICTURE to 2,
+            WindowState.BACKGROUND to 0,
+        )
     }
 }
