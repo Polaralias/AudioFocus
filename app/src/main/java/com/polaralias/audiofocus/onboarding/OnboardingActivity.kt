@@ -23,9 +23,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -101,23 +104,32 @@ class OnboardingActivity : ComponentActivity() {
                         }
                     }
 
-                    OnboardingScreen(
-                        state = state,
-                        onRequestOverlay = { openOverlayPermission() },
-                        onRequestNotification = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                !state.canPostNotifications
-                            ) {
-                                requestPostNotificationPermission()
-                            } else {
-                                openNotificationAccess()
-                            }
-                        },
-                        onRequestAccessibility = { openAccessibilitySettings() },
-                        onComplete = { viewModel.completeOnboarding() },
-                        onContinue = { viewModel.startWelcome() },
-                        onRetry = { viewModel.checkPermissionsAndUpdateStep() }
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        CompositionLocalProvider(
+                            LocalContentColor provides MaterialTheme.colorScheme.onBackground
+                        ) {
+                            OnboardingScreen(
+                                state = state,
+                                onRequestOverlay = { openOverlayPermission() },
+                                onRequestNotification = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        !state.canPostNotifications
+                                    ) {
+                                        requestPostNotificationPermission()
+                                    } else {
+                                        openNotificationAccess()
+                                    }
+                                },
+                                onRequestAccessibility = { openAccessibilitySettings() },
+                                onComplete = { viewModel.completeOnboarding() },
+                                onContinue = { viewModel.startWelcome() },
+                                onRetry = { viewModel.checkPermissionsAndUpdateStep() }
+                            )
+                        }
+                    }
                 }
             }
             Log.d(TAG, "OnboardingActivity content set successfully")
@@ -274,13 +286,15 @@ private fun WelcomeScreen(onContinue: () -> Unit) {
         Text(
             text = stringResource(R.string.onboarding_welcome_title),
             style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.onboarding_welcome_message),
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(32.dp))
         Button(
@@ -313,13 +327,15 @@ private fun PermissionScreen(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = rationale,
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         
         if (showError) {
@@ -381,13 +397,15 @@ private fun CompleteScreen(onComplete: () -> Unit) {
         Text(
             text = stringResource(R.string.onboarding_complete_title),
             style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.onboarding_complete_message),
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(32.dp))
         Button(
