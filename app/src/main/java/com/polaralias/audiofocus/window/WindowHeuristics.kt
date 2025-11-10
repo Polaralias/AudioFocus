@@ -76,10 +76,8 @@ class WindowHeuristics(context: Context) {
         window: AccessibilityWindowInfo,
         coverage: Float,
     ): WindowState {
-        // TYPE_PINNED (value 4) was added in API 26 for Picture-in-Picture windows
-        if (window.type == 4) {
-            return WindowState.PICTURE_IN_PICTURE
-        }
+        // AccessibilityWindowInfo does not expose a TYPE_PINNED constant on this SDK level.
+        // Fall back to heuristic coverage thresholds for identifying Picture-in-Picture windows.
         if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
             return WindowState.BACKGROUND
         }
