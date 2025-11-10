@@ -4,7 +4,6 @@
     <string name="toggle_youtube">Enable for YouTube</string>
     <string name="toggle_youtube_music">Enable for YouTube Music</string>
     <string name="toggle_boot">Start on boot</string>
-    <string name="dim_amount">Dim amount</string>
     <string name="permission_overlay">Draw over other apps</string>
     <string name="permission_notification">Notification access</string>
     <string name="permission_accessibility">Accessibility service</string>

@@ -19,7 +19,7 @@ class OverlayLayoutFactoryTest {
 
     @Test
     fun fullscreenMaskUsesMatchParentHeight() {
-        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen())
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
         assertNotNull(params)
         assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params!!.height)
     }

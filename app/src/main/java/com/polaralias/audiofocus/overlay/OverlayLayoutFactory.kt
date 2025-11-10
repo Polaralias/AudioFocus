@@ -16,7 +16,7 @@ object OverlayLayoutFactory {
                 Log.d(TAG, "No overlay state, returning null layout")
                 null
             }
-            is OverlayState.Fullscreen -> {
+            OverlayState.Fullscreen -> {
                 Log.d(TAG, "Creating fullscreen mask layout")
                 createMaskLayout(
                     context,

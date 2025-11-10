@@ -539,7 +539,7 @@ class OverlayService : LifecycleService() {
             // Fullscreen params work for all states as they cover the entire screen
             try {
                 Log.d(TAG, "Creating mask layout parameters")
-                val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen())
+                val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen)
                 if (maskParams != null) {
                     Log.d(TAG, "Adding mask view to WindowManager")
                     windowManager.addView(maskFrame, maskParams)
@@ -624,15 +624,15 @@ class OverlayService : LifecycleService() {
                 Log.e(TAG, "Error updating mask layout parameters", e)
             }
             
-            // Update background color based on mask alpha
+            // Update background color based on overlay state
             try {
-                val alpha = when (state) {
-                    is OverlayState.Fullscreen -> state.maskAlpha
-                    is OverlayState.Partial -> state.maskAlpha
-                    OverlayState.None -> 0f
+                val color = when (state) {
+                    OverlayState.None -> android.graphics.Color.TRANSPARENT
+                    OverlayState.Fullscreen,
+                    is OverlayState.Partial -> maskColor()
                 }
-                mask.setBackgroundColor(maskColor(alpha))
-                Log.d(TAG, "Mask background color updated with alpha: $alpha")
+                mask.setBackgroundColor(color)
+                Log.d(TAG, "Mask background color updated for state: $state")
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating mask background color", e)
             }
@@ -894,9 +894,8 @@ class OverlayService : LifecycleService() {
     )
 }
 
-private fun OverlayService.maskColor(alpha: Float): Int {
+private fun OverlayService.maskColor(): Int {
     val scheme = audioFocusColorScheme(this)
     val scrim = scheme.scrim
-    val resolvedAlpha = (scrim.alpha * alpha).coerceIn(0f, 1f)
-    return scrim.copy(alpha = resolvedAlpha).toArgb()
+    return scrim.copy(alpha = 1f).toArgb()
 }

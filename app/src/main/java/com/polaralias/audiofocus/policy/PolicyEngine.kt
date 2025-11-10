@@ -23,12 +23,11 @@ object PolicyEngine {
 
         val windowInfo = input.windowInfo.infoFor(pkg)
         return when (pkg) {
-            YOUTUBE -> evaluateYouTube(prefs.enableYouTube, windowInfo, prefs.dimAmount)
+            YOUTUBE -> evaluateYouTube(prefs.enableYouTube, windowInfo)
             YOUTUBE_MUSIC -> evaluateYouTubeMusic(
                 enabled = prefs.enableYouTubeMusic,
                 metadata = input.metadata,
                 windowInfo = windowInfo,
-                dimAmount = prefs.dimAmount,
             )
             else -> {
                 Log.d(TAG, "Package not supported for overlays: $pkg")
@@ -40,7 +39,6 @@ object PolicyEngine {
     private fun evaluateYouTube(
         enabled: Boolean,
         windowInfo: AppWindowInfo?,
-        dimAmount: Float,
     ): OverlayState {
         if (!enabled) {
             Log.d(TAG, "YouTube overlay disabled in preferences")
@@ -53,7 +51,7 @@ object PolicyEngine {
             WindowState.MINIMIZED_IN_APP,
             WindowState.PICTURE_IN_PICTURE -> {
                 Log.d(TAG, "YouTube visible (state=$state), showing fullscreen overlay")
-                OverlayState.Fullscreen(maskAlpha = dimAmount)
+                OverlayState.Fullscreen
             }
             WindowState.BACKGROUND -> {
                 Log.d(TAG, "YouTube not visible (state=$state), hiding overlay")
@@ -66,7 +64,6 @@ object PolicyEngine {
         enabled: Boolean,
         metadata: android.media.MediaMetadata?,
         windowInfo: AppWindowInfo?,
-        dimAmount: Float,
     ): OverlayState {
         if (!enabled) {
             Log.d(TAG, "YouTube Music overlay disabled in preferences")
@@ -88,12 +85,12 @@ object PolicyEngine {
         return when (windowState) {
             WindowState.FULLSCREEN -> {
                 Log.d(TAG, "YouTube Music fullscreen video - showing fullscreen overlay")
-                OverlayState.Fullscreen(maskAlpha = dimAmount)
+                OverlayState.Fullscreen
             }
             WindowState.MINIMIZED_IN_APP,
             WindowState.PICTURE_IN_PICTURE -> {
                 Log.d(TAG, "YouTube Music partial video (state=$windowState) - showing partial overlay")
-                OverlayState.Partial(maskAlpha = dimAmount, heightRatio = PARTIAL_HEIGHT_RATIO)
+                OverlayState.Partial(heightRatio = PARTIAL_HEIGHT_RATIO)
             }
             WindowState.BACKGROUND -> OverlayState.None
         }
