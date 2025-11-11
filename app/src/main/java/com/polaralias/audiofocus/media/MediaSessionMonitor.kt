@@ -73,7 +73,7 @@ class MediaSessionMonitor(
                 return@launch
             }
             val playback = target.playbackState
-            if (playback != null && playback.state == PlaybackState.STATE_PLAYING) {
+            if (playback != null && playback.isActivePlayback()) {
                 _state.value = MediaState.Playing(target, playback, target.metadata)
             } else {
                 _state.value = MediaState.Paused(target, playback, target.metadata)
@@ -85,4 +85,12 @@ class MediaSessionMonitor(
         const val YOUTUBE = "com.google.android.youtube"
         const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
     }
+}
+
+private fun PlaybackState.isActivePlayback(): Boolean = when (state) {
+    PlaybackState.STATE_PLAYING,
+    PlaybackState.STATE_BUFFERING,
+    PlaybackState.STATE_FAST_FORWARDING,
+    PlaybackState.STATE_REWINDING -> true
+    else -> false
 }
