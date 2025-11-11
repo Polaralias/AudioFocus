@@ -1,6 +1,8 @@
 package com.polaralias.audiofocus.ui.controls
 
+import android.graphics.Color
 import android.net.Uri
+import androidx.annotation.ColorInt
 import com.polaralias.audiofocus.data.OverlayDefaults
 import com.polaralias.audiofocus.data.OverlayFillMode
 
@@ -15,6 +17,8 @@ data class ControlsUiState(
     val overlayFillMode: OverlayFillMode = OverlayFillMode.SOLID_COLOR,
     val overlayColor: Int = OverlayDefaults.defaultColor,
     val overlayImageUri: Uri? = null,
+    @ColorInt val containerColor: Int = OverlayDefaults.defaultColor,
+    @ColorInt val contentColor: Int = Color.WHITE,
     val appearanceVersion: Int = 0
 ) {
     val safeDuration: Long get() = duration.coerceAtLeast(0L)

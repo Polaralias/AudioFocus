@@ -113,6 +113,7 @@ class OverlayService : LifecycleService() {
     private var latestPlaybackState: android.media.session.PlaybackState? = null
     private var latestDuration: Long = 0L
     private var tickerJob: Job? = null
+    private var overlayColorJob: Job? = null
     private var collectorsStarted = false
     private var hideAnimationJob: Job? = null
     private val positionEstimator = PlaybackPositionEstimator()
@@ -124,6 +125,7 @@ class OverlayService : LifecycleService() {
     private var lastVisibleState: OverlayState = OverlayState.None
     private var lastVisibleTimestamp: Long = 0L
     private var latestPreferences: OverlayPreferences = OverlayPreferences()
+    private var overlayColorScheme: OverlayColorScheme = OverlayColorAnalyzer.fallbackFor(latestPreferences)
     private var appearanceVersion: Int = 0
 
     override fun onCreate() {
@@ -363,6 +365,7 @@ class OverlayService : LifecycleService() {
         if (latestPreferences != renderState.preferences) {
             latestPreferences = renderState.preferences
             appearanceVersion++
+            refreshOverlayColors(latestPreferences)
             maskView?.applyPreferences(scope, latestPreferences)
         }
 
@@ -457,6 +460,32 @@ class OverlayService : LifecycleService() {
         }
     }
 
+    private fun refreshOverlayColors(preferences: OverlayPreferences) {
+        overlayColorJob?.cancel()
+        overlayColorScheme = OverlayColorAnalyzer.fallbackFor(preferences)
+        overlayColorJob = scope.launch {
+            try {
+                val scheme = OverlayColorAnalyzer.compute(applicationContext, preferences)
+                if (preferences != latestPreferences) {
+                    return@launch
+                }
+                overlayColorScheme = scheme
+                controlsState.update { current ->
+                    current.copy(
+                        overlayFillMode = preferences.fillMode,
+                        overlayColor = preferences.overlayColor,
+                        overlayImageUri = preferences.imageUri,
+                        containerColor = scheme.containerColor,
+                        contentColor = scheme.contentColor,
+                        appearanceVersion = this@OverlayService.appearanceVersion
+                    )
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to compute overlay colors", error)
+            }
+        }
+    }
+
     private fun updateCommander(mediaState: MediaState) {
         commander = when (mediaState) {
             is MediaState.Playing -> MediaTransportCommander(mediaState.controller, mediaState.playbackState)
@@ -488,6 +517,7 @@ class OverlayService : LifecycleService() {
         val canSeekBy = canSeek ||
             actions and android.media.session.PlaybackState.ACTION_FAST_FORWARD != 0L ||
             actions and android.media.session.PlaybackState.ACTION_REWIND != 0L
+        val colors = overlayColorScheme
         controlsState.value = ControlsUiState(
             isVisible = overlayState !is OverlayState.None,
             isPlaying = isPlaying,
@@ -499,6 +529,8 @@ class OverlayService : LifecycleService() {
             overlayFillMode = preferences.fillMode,
             overlayColor = preferences.overlayColor,
             overlayImageUri = preferences.imageUri,
+            containerColor = colors.containerColor,
+            contentColor = colors.contentColor,
             appearanceVersion = appearanceVersion
         )
         restartTicker(isPlaying)
