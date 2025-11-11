@@ -682,4 +682,5 @@ private fun releasePersistablePermission(resolver: ContentResolver, uri: Uri) {
 private const val SETTINGS_SCREEN_TAG = "SettingsScreen"
 
 @Composable
-private fun stringResource(id: Int): String = androidx.compose.ui.res.stringResource(id)
+private fun stringResource(id: Int, vararg formatArgs: Any): String =
+    androidx.compose.ui.res.stringResource(id, *formatArgs)
