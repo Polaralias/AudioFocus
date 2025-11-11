@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
+import android.graphics.Color as AndroidColor
 import androidx.compose.material3.Surface
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -33,6 +34,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.polaralias.audiofocus.data.OverlayFillMode
 import kotlin.math.roundToInt
 import com.polaralias.audiofocus.R
 
@@ -53,6 +56,15 @@ fun ControlsOverlay(
     val iconSizeSeek = if (state.isPartialOverlay) 40.dp else 48.dp
     val iconSizePlay = if (state.isPartialOverlay) 48.dp else 56.dp
     val spacerHeight = if (state.isPartialOverlay) 8.dp else 12.dp
+    val containerColor = remember(state.containerColor) { Color(state.containerColor) }
+    val baseContentColor = remember(state.contentColor) { Color(state.contentColor) }
+    val contentColor = remember(state.overlayColor, state.overlayFillMode, baseContentColor) {
+        if (state.overlayFillMode == OverlayFillMode.SOLID_COLOR && state.overlayColor == AndroidColor.BLACK) {
+            Color.White
+        } else {
+            baseContentColor
+        }
+    }
     
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -62,7 +74,8 @@ fun ControlsOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight(),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            color = containerColor,
+            contentColor = contentColor
         ) {
             Column(
                 modifier = Modifier
@@ -88,7 +101,7 @@ fun ControlsOverlay(
                         Icon(
                             imageVector = Icons.Rounded.Replay10,
                             contentDescription = rewindDescription,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = contentColor,
                             modifier = Modifier.size(iconSizeSeek)
                         )
                     }
@@ -103,7 +116,7 @@ fun ControlsOverlay(
                         Icon(
                             imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = playDescription,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = contentColor,
                             modifier = Modifier.size(iconSizePlay)
                         )
                     }
@@ -120,7 +133,7 @@ fun ControlsOverlay(
                         Icon(
                             imageVector = Icons.Rounded.Forward10,
                             contentDescription = forwardDescription,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = contentColor,
                             modifier = Modifier.size(iconSizeSeek)
                         )
                     }
@@ -141,11 +154,11 @@ fun ControlsOverlay(
                     enabled = state.canSeek,
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.secondary,
-                        activeTrackColor = MaterialTheme.colorScheme.secondary,
-                        activeTickColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
-                        inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f),
-                        inactiveTickColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f)
+                        thumbColor = contentColor,
+                        activeTrackColor = contentColor,
+                        activeTickColor = contentColor.copy(alpha = 0.6f),
+                        inactiveTrackColor = contentColor.copy(alpha = 0.24f),
+                        inactiveTickColor = contentColor.copy(alpha = 0.24f)
                     )
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -156,12 +169,12 @@ fun ControlsOverlay(
                     Text(
                         text = formatTimestamp(state.clampedPosition),
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = contentColor
                     )
                     Text(
                         text = formatTimestamp(state.safeDuration),
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = contentColor
                     )
                 }
             }
