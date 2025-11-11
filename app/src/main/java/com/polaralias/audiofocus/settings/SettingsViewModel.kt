@@ -1,10 +1,12 @@
 package com.polaralias.audiofocus.settings
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.polaralias.audiofocus.R
+import com.polaralias.audiofocus.data.OverlayFillMode
 import com.polaralias.audiofocus.data.PreferencesRepository
 import com.polaralias.audiofocus.service.MediaNotificationListener
 import com.polaralias.audiofocus.service.OverlayServiceStatusTracker
@@ -44,7 +46,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     .collectLatest { prefs ->
                         Log.d(
                             TAG,
-                            "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}"
+                            "Preferences received: enableYouTube=${prefs.enableYouTube}, enableYouTubeMusic=${prefs.enableYouTubeMusic}, startOnBoot=${prefs.startOnBoot}, fillMode=${prefs.fillMode}, hasImage=${prefs.imageUri != null}"
                         )
                         _uiState.update { it.copy(preferences = prefs, isLoading = false) }
                         Log.d(TAG, "UI state updated with preferences, isLoading=false")
@@ -172,6 +174,67 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting start on boot to $enabled", e)
                 // Don't crash - just log the error
+            }
+        }
+    }
+
+    fun useDefaultOverlayColor() {
+        val defaultColor = repository.overlayDefaultColor
+        Log.i(TAG, "Reverting overlay color to default: ${String.format("%08X", defaultColor)}")
+        viewModelScope.launch {
+            try {
+                repository.setOverlayColor(defaultColor)
+                Log.d(TAG, "Overlay color reset to default")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resetting overlay color", e)
+            }
+        }
+    }
+
+    fun setOverlayColor(color: Int) {
+        Log.i(TAG, "Setting custom overlay color: ${String.format("%08X", color)}")
+        viewModelScope.launch {
+            try {
+                repository.setOverlayColor(color)
+                Log.d(TAG, "Custom overlay color saved successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving custom overlay color", e)
+            }
+        }
+    }
+
+    fun setOverlayFillMode(mode: OverlayFillMode) {
+        Log.i(TAG, "Updating overlay fill mode to $mode")
+        viewModelScope.launch {
+            try {
+                repository.setOverlayFillMode(mode)
+                Log.d(TAG, "Overlay fill mode saved successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving overlay fill mode", e)
+            }
+        }
+    }
+
+    fun setOverlayImage(uri: Uri) {
+        Log.i(TAG, "Saving overlay image uri: $uri")
+        viewModelScope.launch {
+            try {
+                repository.setOverlayImage(uri)
+                Log.d(TAG, "Overlay image uri saved successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving overlay image uri", e)
+            }
+        }
+    }
+
+    fun clearOverlayImage() {
+        Log.i(TAG, "Clearing overlay image preference")
+        viewModelScope.launch {
+            try {
+                repository.clearOverlayImage()
+                Log.d(TAG, "Overlay image preference cleared")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing overlay image preference", e)
             }
         }
     }

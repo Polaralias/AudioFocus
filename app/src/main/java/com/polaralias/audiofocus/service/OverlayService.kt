@@ -14,7 +14,6 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
@@ -42,7 +41,6 @@ import com.polaralias.audiofocus.policy.PolicyInput
 import com.polaralias.audiofocus.ui.controls.ControlsOverlay
 import com.polaralias.audiofocus.ui.controls.ControlsUiState
 import com.polaralias.audiofocus.ui.theme.AudioFocusTheme
-import com.polaralias.audiofocus.ui.theme.audioFocusColorScheme
 import com.polaralias.audiofocus.util.PermissionValidator
 import com.polaralias.audiofocus.window.WindowInfo
 import kotlinx.coroutines.CoroutineScope
@@ -104,7 +102,7 @@ class OverlayService : LifecycleService() {
     private lateinit var mediaMonitor: MediaSessionMonitor
     private lateinit var preferences: PreferencesRepository
 
-    private var maskView: View? = null
+    private var maskView: OverlayMaskContainer? = null
     private var controlsView: ComposeView? = null
     private var controlsSavedStateOwner: OverlaySavedStateOwner? = null
     private var currentOverlay: OverlayState = OverlayState.None
@@ -117,13 +115,15 @@ class OverlayService : LifecycleService() {
     private var tickerJob: Job? = null
     private var collectorsStarted = false
     private var hideAnimationJob: Job? = null
-    
+
     // Debounce mechanism: Track pending overlay state changes to prevent flickering
     // Grace period allows tolerating brief mismatches in detection without hiding overlay
     private var pendingOverlayState: OverlayState? = null
     private var debounceJob: Job? = null
     private var lastVisibleState: OverlayState = OverlayState.None
     private var lastVisibleTimestamp: Long = 0L
+    private var latestPreferences: OverlayPreferences = OverlayPreferences()
+    private var appearanceVersion: Int = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -337,7 +337,7 @@ class OverlayService : LifecycleService() {
                                 preferences = prefs
                             )
                         )
-                        OverlayRenderState(media, overlay)
+                        OverlayRenderState(media, overlay, prefs)
                     }.collectLatest { renderState ->
                         applyRenderState(renderState)
                     }
@@ -359,8 +359,14 @@ class OverlayService : LifecycleService() {
     }
 
     private fun applyRenderState(renderState: OverlayRenderState) {
+        if (latestPreferences != renderState.preferences) {
+            latestPreferences = renderState.preferences
+            appearanceVersion++
+            maskView?.applyPreferences(scope, latestPreferences)
+        }
+
         updateCommander(renderState.mediaState)
-        updateControls(renderState.mediaState, renderState.overlayState)
+        updateControls(renderState.mediaState, renderState.overlayState, renderState.preferences)
 
         when (renderState.mediaState) {
             is MediaState.Playing -> OverlayServiceStatusTracker.update(OverlayServiceState.RUNNING)
@@ -458,7 +464,11 @@ class OverlayService : LifecycleService() {
         }
     }
 
-    private fun updateControls(mediaState: MediaState, overlayState: OverlayState) {
+    private fun updateControls(
+        mediaState: MediaState,
+        overlayState: OverlayState,
+        preferences: OverlayPreferences
+    ) {
         val playback = when (mediaState) {
             is MediaState.Playing -> mediaState.playbackState
             is MediaState.Paused -> mediaState.playbackState
@@ -484,7 +494,11 @@ class OverlayService : LifecycleService() {
             duration = latestDuration,
             canSeek = canSeek,
             canSeekBy = canSeekBy,
-            isPartialOverlay = overlayState is OverlayState.Partial
+            isPartialOverlay = overlayState is OverlayState.Partial,
+            overlayFillMode = preferences.fillMode,
+            overlayColor = preferences.overlayColor,
+            overlayImageUri = preferences.imageUri,
+            appearanceVersion = appearanceVersion
         )
         restartTicker(isPlaying)
     }
@@ -526,13 +540,14 @@ class OverlayService : LifecycleService() {
             Log.i(TAG, "Attaching overlay views to WindowManager")
             
             // Create and attach mask view (initially hidden)
-            val maskFrame = FrameLayout(this).apply {
+            val maskFrame = OverlayMaskContainer(this).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 visibility = View.GONE // Start hidden
                 alpha = 0f
+                applyPreferences(scope, latestPreferences)
             }
             
             // Use Fullscreen state for initial layout params (will be updated later based on actual state)
@@ -603,14 +618,14 @@ class OverlayService : LifecycleService() {
      * This updates the existing attached view rather than recreating it.
      */
     private fun updateMaskForState(state: OverlayState) {
-        val mask = maskView as? FrameLayout ?: run {
+        val mask = maskView ?: run {
             Log.w(TAG, "Mask view not attached, cannot update")
             return
         }
-        
+
         try {
             Log.d(TAG, "Updating mask for state: $state")
-            
+
             // Update layout parameters if state changed
             try {
                 val params = OverlayLayoutFactory.maskLayoutFor(this, state)
@@ -623,20 +638,7 @@ class OverlayService : LifecycleService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating mask layout parameters", e)
             }
-            
-            // Update background color based on overlay state
-            try {
-                val color = when (state) {
-                    OverlayState.None -> android.graphics.Color.TRANSPARENT
-                    OverlayState.Fullscreen,
-                    is OverlayState.Partial -> maskColor()
-                }
-                mask.setBackgroundColor(color)
-                Log.d(TAG, "Mask background color updated for state: $state")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating mask background color", e)
-            }
-            
+
             Log.d(TAG, "Mask view updated successfully for state: $state")
         } catch (e: Exception) {
             Log.e(TAG, "Error updating mask for state: $state", e)
@@ -808,12 +810,13 @@ class OverlayService : LifecycleService() {
     private fun removeOverlays() {
         Log.i(TAG, "Removing overlays: maskView=${maskView != null}, controlsView=${controlsView != null}")
         try {
-            maskView?.let { 
+            maskView?.let {
+                it.clearImage()
                 runCatching {
                     Log.d(TAG, "Removing mask view from WindowManager")
                     // Ensure animations are cancelled before removal
                     OverlayAnimator.hideImmediate(it)
-                    windowManager.removeViewImmediate(it) 
+                    windowManager.removeViewImmediate(it)
                     Log.i(TAG, "Mask view removed successfully")
                 }.onFailure { e ->
                     Log.e(TAG, "Error removing mask view", e)
@@ -890,12 +893,7 @@ class OverlayService : LifecycleService() {
 
     private data class OverlayRenderState(
         val mediaState: MediaState,
-        val overlayState: OverlayState
+        val overlayState: OverlayState,
+        val preferences: OverlayPreferences
     )
-}
-
-private fun OverlayService.maskColor(): Int {
-    val scheme = audioFocusColorScheme(this)
-    val scrim = scheme.scrim
-    return scrim.copy(alpha = 1f).toArgb()
 }
