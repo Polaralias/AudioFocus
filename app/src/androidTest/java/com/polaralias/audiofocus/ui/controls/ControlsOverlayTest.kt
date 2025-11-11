@@ -43,7 +43,7 @@ class ControlsOverlayTest {
         }
 
         val context = composeRule.activity
-        composeRule.onNodeWithContentDescription(context.getString(R.string.control_play)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.control_pause)).performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.control_rewind)).performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.control_forward)).performClick()
         composeRule.onNodeWithRole(Role.Slider)
@@ -78,7 +78,7 @@ class ControlsOverlayTest {
         }
 
         val context = composeRule.activity
-        composeRule.onNodeWithContentDescription(context.getString(R.string.control_play)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.control_pause)).performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.control_rewind)).performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.control_forward)).performClick()
         composeRule.onNodeWithRole(Role.Slider)

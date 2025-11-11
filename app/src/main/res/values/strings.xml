@@ -42,6 +42,7 @@
     <string name="accessibility_service_description">Observes YouTube Music window bounds to determine when video is fullscreen.</string>
     <string name="control_rewind">Rewind 10 seconds</string>
     <string name="control_play">Toggle play or pause</string>
+    <string name="control_pause">Pause</string>
     <string name="control_forward">Forward 10 seconds</string>
     <string name="setup_title">Set up AudioFocus</string>
     <string name="setup_description">Follow the steps below to enable overlay controls on top of YouTube playback.</string>

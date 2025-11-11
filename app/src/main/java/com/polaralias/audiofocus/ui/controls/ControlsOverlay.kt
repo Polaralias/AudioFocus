@@ -21,7 +21,6 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -112,10 +111,10 @@ fun ControlsOverlay(
                         },
                         modifier = Modifier.size(buttonSizePlay)
                     ) {
-                        val playDescription = stringResource(id = R.string.control_play)
+                        val pauseDescription = stringResource(id = R.string.control_pause)
                         Icon(
-                            imageVector = if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = playDescription,
+                            imageVector = Icons.Rounded.Pause,
+                            contentDescription = pauseDescription,
                             tint = contentColor,
                             modifier = Modifier.size(iconSizePlay)
                         )
