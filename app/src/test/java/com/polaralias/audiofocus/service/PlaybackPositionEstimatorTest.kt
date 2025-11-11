@@ -3,7 +3,10 @@ package com.polaralias.audiofocus.service
 import android.media.session.PlaybackState
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class PlaybackPositionEstimatorTest {
     private class FakeClock(var now: Long = 0L) {
         fun advance(byMillis: Long) {
