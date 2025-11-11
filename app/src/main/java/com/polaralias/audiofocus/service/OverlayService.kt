@@ -115,6 +115,7 @@ class OverlayService : LifecycleService() {
     private var tickerJob: Job? = null
     private var collectorsStarted = false
     private var hideAnimationJob: Job? = null
+    private val positionEstimator = PlaybackPositionEstimator()
 
     // Debounce mechanism: Track pending overlay state changes to prevent flickering
     // Grace period allows tolerating brief mismatches in detection without hiding overlay
@@ -506,15 +507,7 @@ class OverlayService : LifecycleService() {
     private fun computePosition(
         playback: android.media.session.PlaybackState?,
         isPlaying: Boolean
-    ): Long {
-        if (playback == null) return 0L
-        var position = playback.position
-        if (isPlaying && playback.lastPositionUpdateTime > 0L) {
-            val delta = SystemClock.elapsedRealtime() - playback.lastPositionUpdateTime
-            if (delta > 0) position += delta
-        }
-        return position.coerceAtLeast(0L)
-    }
+    ): Long = positionEstimator.compute(playback, isPlaying)
 
     private fun restartTicker(isPlaying: Boolean) {
         tickerJob?.cancel()
