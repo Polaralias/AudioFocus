@@ -48,6 +48,42 @@ class PolicyEngineTest {
     }
 
     @Test
+    fun youtubePiPShowsOverlayEvenWithoutSurfaceSignal() {
+        val input = PolicyInput(
+            packageName = "com.google.android.youtube",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.youtube",
+                state = WindowState.PICTURE_IN_PICTURE,
+                hasVideoSurface = false,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
+    fun youtubeMiniplayerUsesRelaxedSignal() {
+        val input = PolicyInput(
+            packageName = "com.google.android.youtube",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.youtube",
+                state = WindowState.MINIMIZED_IN_APP,
+                hasVideoSurface = false,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
     fun youtubeInBackgroundHidesOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.youtube",
@@ -115,6 +151,45 @@ class PolicyEngineTest {
             OverlayState.Partial(heightRatio = 0.8f),
             result
         )
+    }
+
+    @Test
+    fun youtubeMusicPiPVideoShowsPartialOverlayEvenWithoutSurface() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = videoMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.PICTURE_IN_PICTURE,
+                hasVideoSurface = false,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(
+            OverlayState.Partial(heightRatio = 0.8f),
+            result
+        )
+    }
+
+    @Test
+    fun youtubeMusicPiPAudioHidesOverlay() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = audioMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.PICTURE_IN_PICTURE,
+                hasVideoSurface = false,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.None, result)
     }
 
     @Test
