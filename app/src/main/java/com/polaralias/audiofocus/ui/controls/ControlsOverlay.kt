@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import android.graphics.Color as AndroidColor
-import androidx.compose.material3.Surface
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Slider
@@ -55,7 +54,6 @@ fun ControlsOverlay(
     val iconSizeSeek = if (state.isPartialOverlay) 40.dp else 48.dp
     val iconSizePlay = if (state.isPartialOverlay) 48.dp else 56.dp
     val spacerHeight = if (state.isPartialOverlay) 8.dp else 12.dp
-    val containerColor = remember(state.containerColor) { Color(state.containerColor) }
     val baseContentColor = remember(state.contentColor) { Color(state.contentColor) }
     val contentColor = remember(state.overlayColor, state.overlayFillMode, baseContentColor) {
         if (state.overlayFillMode == OverlayFillMode.SOLID_COLOR && state.overlayColor == AndroidColor.BLACK) {
@@ -64,118 +62,111 @@ fun ControlsOverlay(
             baseContentColor
         }
     }
-    
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight(),
-            color = containerColor,
-            contentColor = contentColor
+                .wrapContentHeight()
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val rewindDescription = stringResource(id = R.string.control_rewind)
-                    IconButton(
-                        onClick = {
-                            if (state.canSeekBy) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onSeekBy(-10_000)
-                            }
-                        },
-                        modifier = Modifier.size(buttonSizeSeek)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Replay10,
-                            contentDescription = rewindDescription,
-                            tint = contentColor,
-                            modifier = Modifier.size(iconSizeSeek)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onTogglePlayPause()
-                        },
-                        modifier = Modifier.size(buttonSizePlay)
-                    ) {
-                        val pauseDescription = stringResource(id = R.string.control_pause)
-                        Icon(
-                            imageVector = Icons.Rounded.Pause,
-                            contentDescription = pauseDescription,
-                            tint = contentColor,
-                            modifier = Modifier.size(iconSizePlay)
-                        )
-                    }
-                    val forwardDescription = stringResource(id = R.string.control_forward)
-                    IconButton(
-                        onClick = {
-                            if (state.canSeekBy) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onSeekBy(10_000)
-                            }
-                        },
-                        modifier = Modifier.size(buttonSizeSeek)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Forward10,
-                            contentDescription = forwardDescription,
-                            tint = contentColor,
-                            modifier = Modifier.size(iconSizeSeek)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(spacerHeight))
-                val sliderValue = remember(state.position, state.duration) {
-                    val duration = state.safeDuration.toFloat()
-                    if (duration <= 0f) 0f else state.clampedPosition.toFloat().coerceIn(0f, duration)
-                }
-                Slider(
-                    value = sliderValue,
-                    onValueChange = {
-                        if (state.canSeek) {
-                            onSeekTo(it.roundToInt().toLong())
+                val rewindDescription = stringResource(id = R.string.control_rewind)
+                IconButton(
+                    onClick = {
+                        if (state.canSeekBy) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSeekBy(-10_000)
                         }
                     },
-                    valueRange = 0f..state.safeDuration.toFloat().coerceAtLeast(0f),
-                    enabled = state.canSeek,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = contentColor,
-                        activeTrackColor = contentColor,
-                        activeTickColor = contentColor.copy(alpha = 0.6f),
-                        inactiveTrackColor = contentColor.copy(alpha = 0.24f),
-                        inactiveTickColor = contentColor.copy(alpha = 0.24f)
-                    )
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.size(buttonSizeSeek)
                 ) {
-                    Text(
-                        text = formatTimestamp(state.clampedPosition),
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = contentColor
-                    )
-                    Text(
-                        text = formatTimestamp(state.safeDuration),
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = contentColor
+                    Icon(
+                        imageVector = Icons.Rounded.Replay10,
+                        contentDescription = rewindDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(iconSizeSeek)
                     )
                 }
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTogglePlayPause()
+                    },
+                    modifier = Modifier.size(buttonSizePlay)
+                ) {
+                    val pauseDescription = stringResource(id = R.string.control_pause)
+                    Icon(
+                        imageVector = Icons.Rounded.Pause,
+                        contentDescription = pauseDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(iconSizePlay)
+                    )
+                }
+                val forwardDescription = stringResource(id = R.string.control_forward)
+                IconButton(
+                    onClick = {
+                        if (state.canSeekBy) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSeekBy(10_000)
+                        }
+                    },
+                    modifier = Modifier.size(buttonSizeSeek)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Forward10,
+                        contentDescription = forwardDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(iconSizeSeek)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(spacerHeight))
+            val sliderValue = remember(state.position, state.duration) {
+                val duration = state.safeDuration.toFloat()
+                if (duration <= 0f) 0f else state.clampedPosition.toFloat().coerceIn(0f, duration)
+            }
+            Slider(
+                value = sliderValue,
+                onValueChange = {
+                    if (state.canSeek) {
+                        onSeekTo(it.roundToInt().toLong())
+                    }
+                },
+                valueRange = 0f..state.safeDuration.toFloat().coerceAtLeast(0f),
+                enabled = state.canSeek,
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = contentColor,
+                    activeTrackColor = contentColor,
+                    activeTickColor = contentColor.copy(alpha = 0.6f),
+                    inactiveTrackColor = contentColor.copy(alpha = 0.24f),
+                    inactiveTickColor = contentColor.copy(alpha = 0.24f)
+                )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatTimestamp(state.clampedPosition),
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    color = contentColor
+                )
+                Text(
+                    text = formatTimestamp(state.safeDuration),
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    color = contentColor
+                )
             }
         }
     }
