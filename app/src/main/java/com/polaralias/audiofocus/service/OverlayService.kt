@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
@@ -57,6 +58,17 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private object PlaybackStateExtras {
+    private const val EXTRA_DURATION_COMPAT = "android.media.playbackstate.extra.DURATION"
+    private const val EXTRA_DURATION_STANDARD = "android.media.extra.DURATION"
+
+    fun durationFrom(extras: Bundle?): Long? {
+        if (extras == null) return null
+        return extras.getLong(EXTRA_DURATION_STANDARD, -1L).takeIf { it > 0L }
+            ?: extras.getLong(EXTRA_DURATION_COMPAT, -1L).takeIf { it > 0L }
+    }
+}
 
 class OverlayService : LifecycleService() {
     companion object {
@@ -556,10 +568,7 @@ class OverlayService : LifecycleService() {
         val metadataDuration = metadata
             ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
             ?.takeIf { it > 0L }
-        val extrasDuration = playback
-            ?.extras
-            ?.getLong(android.media.session.PlaybackState.EXTRA_DURATION, -1L)
-            ?.takeIf { it > 0L }
+        val extrasDuration = PlaybackStateExtras.durationFrom(playback?.extras)
         val previous = previousDuration.takeIf { it > 0L }
         val positionFallback = currentPosition.takeIf { it > 0L }
 
