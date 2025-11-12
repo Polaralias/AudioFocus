@@ -23,7 +23,7 @@ data class OverlayColorScheme(
 
 object OverlayColorAnalyzer {
     private const val TAG = "OverlayColorAnalyzer"
-    private const val CONTAINER_ALPHA = 0xEB
+    private const val CONTAINER_ALPHA = 0xFF
 
     suspend fun compute(
         context: Context,
@@ -48,7 +48,11 @@ object OverlayColorAnalyzer {
     }
 
     private fun overlayContainerColor(@ColorInt color: Int): Int {
-        return ColorUtils.setAlphaComponent(color, CONTAINER_ALPHA)
+        return if (Color.alpha(color) == CONTAINER_ALPHA) {
+            color
+        } else {
+            ColorUtils.setAlphaComponent(color, CONTAINER_ALPHA)
+        }
     }
 
     private fun contrastingColor(@ColorInt color: Int): Int {
