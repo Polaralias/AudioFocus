@@ -511,18 +511,23 @@ class OverlayService : LifecycleService() {
             MediaState.Idle -> null
         }
         latestPlaybackState = playback
-        latestDuration = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
         val isPlaying = mediaState is MediaState.Playing
         val actions = playback?.actions ?: 0L
         val canSeek = actions and android.media.session.PlaybackState.ACTION_SEEK_TO != 0L
         val canSeekBy = canSeek ||
             actions and android.media.session.PlaybackState.ACTION_FAST_FORWARD != 0L ||
             actions and android.media.session.PlaybackState.ACTION_REWIND != 0L
+        val position = computePosition(playback, isPlaying)
+        latestDuration = if (playback != null || metadata != null) {
+            resolveDuration(metadata, playback, latestDuration, position)
+        } else {
+            0L
+        }
         val colors = overlayColorScheme
         controlsState.value = ControlsUiState(
             isVisible = overlayState !is OverlayState.None,
             isPlaying = isPlaying,
-            position = computePosition(playback, isPlaying),
+            position = position,
             duration = latestDuration,
             canSeek = canSeek,
             canSeekBy = canSeekBy,
@@ -541,6 +546,29 @@ class OverlayService : LifecycleService() {
         playback: android.media.session.PlaybackState?,
         isPlaying: Boolean
     ): Long = positionEstimator.compute(playback, isPlaying)
+
+    private fun resolveDuration(
+        metadata: android.media.MediaMetadata?,
+        playback: android.media.session.PlaybackState?,
+        previousDuration: Long,
+        currentPosition: Long
+    ): Long {
+        val metadataDuration = metadata
+            ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+            ?.takeIf { it > 0L }
+        val extrasDuration = playback
+            ?.extras
+            ?.getLong(android.media.session.PlaybackState.EXTRA_DURATION, -1L)
+            ?.takeIf { it > 0L }
+        val previous = previousDuration.takeIf { it > 0L }
+        val positionFallback = currentPosition.takeIf { it > 0L }
+
+        return metadataDuration
+            ?: extrasDuration
+            ?: previous
+            ?: positionFallback
+            ?: 0L
+    }
 
     private fun restartTicker(isPlaying: Boolean) {
         tickerJob?.cancel()
