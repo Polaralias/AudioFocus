@@ -108,6 +108,7 @@ class OverlayManagerTest {
             WindowState.FULLSCREEN to OverlayCommand.Show(OverlayMode.FULL),
             WindowState.MINIMIZED to OverlayCommand.Show(OverlayMode.FULL),
             WindowState.PICTURE_IN_PICTURE to OverlayCommand.Show(OverlayMode.FULL),
+            WindowState.BACKGROUND to OverlayCommand.Hide,
             WindowState.UNKNOWN to OverlayCommand.Hide,
         )
 
@@ -128,6 +129,7 @@ class OverlayManagerTest {
             WindowState.FULLSCREEN to OverlayCommand.Show(OverlayMode.FULL),
             WindowState.MINIMIZED to OverlayCommand.Show(OverlayMode.PARTIAL),
             WindowState.PICTURE_IN_PICTURE to OverlayCommand.Show(OverlayMode.PARTIAL),
+            WindowState.BACKGROUND to OverlayCommand.Hide,
             WindowState.UNKNOWN to OverlayCommand.Hide,
         )
 

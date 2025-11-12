@@ -89,6 +89,10 @@ class OverlayManager {
                 Log.d(TAG, "YouTube PiP detected, showing full overlay")
                 OverlayCommand.Show(OverlayMode.FULL)
             }
+            WindowState.BACKGROUND -> {
+                Log.d(TAG, "YouTube background playback detected, hiding overlay")
+                OverlayCommand.Hide
+            }
             WindowState.UNKNOWN -> {
                 Log.d(TAG, "YouTube window state unknown, hiding overlay")
                 OverlayCommand.Hide
@@ -113,6 +117,10 @@ class OverlayManager {
             WindowState.PICTURE_IN_PICTURE -> {
                 Log.d(TAG, "YouTube Music PiP detected, showing partial overlay")
                 OverlayCommand.Show(OverlayMode.PARTIAL)
+            }
+            WindowState.BACKGROUND -> {
+                Log.d(TAG, "YouTube Music background playback detected, hiding overlay")
+                OverlayCommand.Hide
             }
             WindowState.UNKNOWN -> {
                 Log.d(TAG, "YouTube Music window state unknown, hiding overlay")
