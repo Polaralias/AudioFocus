@@ -37,11 +37,21 @@ class WindowHeuristics(context: Context) {
                 val coverage = coverage(bounds, metrics)
                 val state = determineWindowState(window, coverage)
 
-                val hasVideoSurface = when {
-                    state == WindowState.BACKGROUND -> false
-                    packageName == YOUTUBE_MUSIC ->
-                        state == WindowState.FULLSCREEN || hasLikelyVideoSurface(root)
-                    else -> true
+                val likelyVideoSurface by lazy { hasLikelyVideoSurface(root) }
+                val hasVideoSurface = when (packageName) {
+                    YOUTUBE -> when (state) {
+                        WindowState.BACKGROUND -> false
+                        WindowState.FULLSCREEN,
+                        WindowState.MINIMIZED_IN_APP,
+                        WindowState.PICTURE_IN_PICTURE -> likelyVideoSurface
+                    }
+                    YOUTUBE_MUSIC -> when (state) {
+                        WindowState.BACKGROUND -> false
+                        WindowState.FULLSCREEN -> true
+                        WindowState.MINIMIZED_IN_APP,
+                        WindowState.PICTURE_IN_PICTURE -> likelyVideoSurface
+                    }
+                    else -> false
                 }
 
                 val candidate = WindowCandidate(

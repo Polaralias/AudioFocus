@@ -45,7 +45,17 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        val state = windowInfo?.state ?: WindowState.BACKGROUND
+        val info = windowInfo ?: run {
+            Log.d(TAG, "YouTube window not visible, hiding overlay")
+            return OverlayState.None
+        }
+
+        if (!info.hasVisibleVideoSurface) {
+            Log.d(TAG, "YouTube has no visible video surface, hiding overlay")
+            return OverlayState.None
+        }
+
+        val state = info.state
         return when (state) {
             WindowState.FULLSCREEN,
             WindowState.MINIMIZED_IN_APP,
@@ -70,15 +80,25 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        val windowState = windowInfo?.state ?: WindowState.BACKGROUND
+        val info = windowInfo ?: run {
+            Log.d(TAG, "YouTube Music window not visible, hiding overlay")
+            return OverlayState.None
+        }
+
+        val windowState = info.state
         if (windowState == WindowState.BACKGROUND) {
             Log.d(TAG, "YouTube Music not visible (background playback)")
             return OverlayState.None
         }
 
-        val isVideo = isYouTubeMusicVideo(metadata)
-        if (!isVideo && windowInfo?.hasVisibleVideoSurface != true) {
-            Log.d(TAG, "YouTube Music playback not identified as video")
+        if (!info.hasVisibleVideoSurface) {
+            Log.d(TAG, "YouTube Music window lacks visible video surface, hiding overlay")
+            return OverlayState.None
+        }
+
+        val isVideo = isYouTubeMusicVideo(metadata, info.hasVisibleVideoSurface)
+        if (!isVideo) {
+            Log.d(TAG, "YouTube Music playback classified as non-video")
             return OverlayState.None
         }
 
@@ -111,8 +131,14 @@ object PolicyEngine {
         }
     }
 
-    private fun isYouTubeMusicVideo(metadata: android.media.MediaMetadata?): Boolean {
-        if (metadata == null) return false
+    private fun isYouTubeMusicVideo(
+        metadata: android.media.MediaMetadata?,
+        hasVisibleSurface: Boolean,
+    ): Boolean {
+        if (metadata == null) {
+            Log.d(TAG, "YouTube Music metadata unavailable; defaulting to surface visibility=$hasVisibleSurface")
+            return hasVisibleSurface
+        }
         val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
         val height = metadata.getLong(METADATA_KEY_VIDEO_HEIGHT)
         val presentationType = metadata.getLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
