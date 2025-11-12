@@ -91,15 +91,8 @@ class PlaybackPositionEstimatorTest {
         speed: Float,
         updateTime: Long
     ): PlaybackState {
-        val playback = PlaybackState.Builder()
-            .setState(state, position, speed)
+        return PlaybackState.Builder()
+            .setState(state, position, speed, updateTime)
             .build()
-
-        playback.javaClass.getDeclaredField("mLastPositionUpdateTime").apply {
-            isAccessible = true
-            setLong(playback, updateTime)
-        }
-
-        return playback
     }
 }
