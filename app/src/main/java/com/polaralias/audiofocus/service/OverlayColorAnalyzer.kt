@@ -48,10 +48,11 @@ object OverlayColorAnalyzer {
     }
 
     private fun overlayContainerColor(@ColorInt color: Int): Int {
-        return if (Color.alpha(color) == CONTAINER_ALPHA) {
+        val alpha = color ushr 24
+        return if (alpha == CONTAINER_ALPHA) {
             color
         } else {
-            ColorUtils.setAlphaComponent(color, CONTAINER_ALPHA)
+            (color and 0x00FFFFFF) or (CONTAINER_ALPHA shl 24)
         }
     }
 

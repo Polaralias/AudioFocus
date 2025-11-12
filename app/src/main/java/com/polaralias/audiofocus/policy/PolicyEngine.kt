@@ -98,12 +98,13 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        val relaxedSignal = info.hasVisibleVideoSurface || windowState in RELAXED_VIDEO_STATES || windowState == WindowState.FULLSCREEN
+        val hasVideoSurface = info.hasVisibleVideoSurface
+        val relaxedSignal = windowState in RELAXED_VIDEO_STATES
         val classification = classifyYouTubeMusicVideo(metadata)
         val isVideo = when (classification) {
-            VideoClassification.VIDEO -> true
+            VideoClassification.VIDEO -> hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE
             VideoClassification.AUDIO -> false
-            VideoClassification.UNKNOWN -> relaxedSignal
+            VideoClassification.UNKNOWN -> hasVideoSurface || relaxedSignal || windowState == WindowState.FULLSCREEN
         }
 
         if (!isVideo) {
