@@ -126,7 +126,7 @@ class PolicyEngineTest {
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.apps.youtube.music",
                 state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = false
+                hasVideoSurface = true
             ),
             preferences = prefs
         )
@@ -142,6 +142,42 @@ class PolicyEngineTest {
             playbackState = playingState,
             metadata = videoMetadata(),
             windowInfo = WindowInfo.Empty,
+            preferences = prefs
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.None, result)
+    }
+
+    @Test
+    fun youtubeWithoutVisibleVideoSurfaceHidesOverlay() {
+        val input = PolicyInput(
+            packageName = "com.google.android.youtube",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.youtube",
+                state = WindowState.FULLSCREEN,
+                hasVideoSurface = false
+            ),
+            preferences = prefs
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.None, result)
+    }
+
+    @Test
+    fun youtubeMusicVideoWithoutVisibleSurfaceHidesOverlay() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = videoMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                hasVideoSurface = false
+            ),
             preferences = prefs
         )
 
