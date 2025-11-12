@@ -144,8 +144,8 @@ class AudioFocusAccessibilityService : AccessibilityService() {
 
         // Edge case: Window too small (likely background/hidden)
         if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
-            Log.d(TAG, "Window coverage too small: $coverage, state=UNKNOWN")
-            return WindowState.UNKNOWN
+            Log.d(TAG, "Window coverage indicates background: $coverage, state=BACKGROUND")
+            return WindowState.BACKGROUND
         }
 
         // Determine fullscreen vs minimized

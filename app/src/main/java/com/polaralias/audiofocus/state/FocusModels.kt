@@ -9,6 +9,7 @@ enum class WindowState {
     FULLSCREEN,
     MINIMIZED,
     PICTURE_IN_PICTURE,
+    BACKGROUND,
     UNKNOWN,
 }
 
