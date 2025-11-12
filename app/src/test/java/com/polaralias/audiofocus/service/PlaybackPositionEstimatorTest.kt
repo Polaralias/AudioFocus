@@ -85,6 +85,25 @@ class PlaybackPositionEstimatorTest {
         assertEquals(6_000L, advanced)
     }
 
+    @Test
+    fun advancesWhenUpdateTimeIsWallClock() {
+        val clock = FakeClock(now = 10_000L)
+        val estimator = PlaybackPositionEstimator { clock.now }
+        val playback = playbackState(
+            state = PlaybackState.STATE_PLAYING,
+            position = 5_000L,
+            speed = 1f,
+            updateTime = 1_700_000_000_000L
+        )
+
+        val first = estimator.compute(playback, isPlaying = true)
+        assertEquals(5_000L, first)
+
+        clock.advance(1_000L)
+        val second = estimator.compute(playback, isPlaying = true)
+        assertEquals(6_000L, second)
+    }
+
     private fun playbackState(
         state: Int,
         position: Long,

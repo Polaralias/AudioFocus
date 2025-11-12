@@ -23,11 +23,13 @@ internal class PlaybackPositionEstimator(
             ?: anchorSpeed.takeIf { it > 0f }
             ?: 1f
         val now = elapsedRealtime()
+        val rawUpdateDelta = now - rawUpdateTime
+        val hasSaneUpdateTime = rawUpdateTime > 0L && rawUpdateDelta >= 0 && rawUpdateDelta <= MAX_SANE_UPDATE_DELTA
 
         val position = if (isPlaying) {
             val basePosition: Long
             val baseTime: Long
-            if (rawUpdateTime > 0L) {
+            if (hasSaneUpdateTime) {
                 basePosition = rawPosition
                 baseTime = rawUpdateTime
             } else if (anchorRealtime != NO_TIME && rawPosition == lastRawPosition) {
@@ -63,5 +65,6 @@ internal class PlaybackPositionEstimator(
 
     private companion object {
         private const val NO_TIME = Long.MIN_VALUE
+        private const val MAX_SANE_UPDATE_DELTA = 5 * 60 * 1000L
     }
 }
