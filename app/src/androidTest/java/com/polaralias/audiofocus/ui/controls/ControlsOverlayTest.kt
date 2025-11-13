@@ -33,6 +33,7 @@ class ControlsOverlayTest {
                         position = 1_000L,
                         duration = 10_000L,
                         canSeek = true,
+                        canSeekTo = true,
                         canSeekBy = true
                     ),
                     onTogglePlayPause = { events.add("toggle") },
@@ -67,6 +68,7 @@ class ControlsOverlayTest {
                         position = 1_000L,
                         duration = 10_000L,
                         canSeek = true,
+                        canSeekTo = true,
                         canSeekBy = true,
                         isPartialOverlay = true
                     ),
@@ -88,5 +90,34 @@ class ControlsOverlayTest {
         assertTrue(events.contains("seekBy:-10000"))
         assertTrue(events.contains("seekBy:10000"))
         assertTrue(events.any { it.startsWith("seekTo:") })
+    }
+
+    @Test
+    fun sliderFallsBackToSeekByWhenSeekToUnavailable() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            AudioFocusTheme {
+                ControlsOverlay(
+                    state = ControlsUiState(
+                        isVisible = true,
+                        isPlaying = true,
+                        position = 2_000L,
+                        duration = 12_000L,
+                        canSeek = true,
+                        canSeekTo = false,
+                        canSeekBy = true
+                    ),
+                    onTogglePlayPause = { events.add("toggle") },
+                    onSeekBy = { events.add("seekBy:$it") },
+                    onSeekTo = { events.add("seekTo:$it") }
+                )
+            }
+        }
+
+        composeRule.onNodeWithRole(Role.Slider)
+            .performSemanticsAction(SemanticsActions.SetProgress) { action -> action(6_000f) }
+
+        assertTrue(events.any { it == "seekBy:4000" })
+        assertTrue(events.none { it.startsWith("seekTo:") })
     }
 }
