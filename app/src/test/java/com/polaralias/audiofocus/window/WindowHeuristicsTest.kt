@@ -34,9 +34,11 @@ class WindowHeuristicsTest {
             packageName = "com.google.android.youtube"
         }
 
+        val pipWindowTypePinned = 4 // Matches WindowHeuristics.determineWindowState PiP type check
+
         val pipWindowWithRoot = mock<AccessibilityWindowInfo> {
             on { id } doReturn(1)
-            on { type } doReturn(AccessibilityWindowInfo.TYPE_PINNED)
+            on { type } doReturn(pipWindowTypePinned)
             on { isActive } doReturn(false)
             on { root } doReturn(rootNode)
         }
@@ -50,7 +52,7 @@ class WindowHeuristicsTest {
 
         val pipWindowWithoutRoot = mock<AccessibilityWindowInfo> {
             on { id } doReturn(1)
-            on { type } doReturn(AccessibilityWindowInfo.TYPE_PINNED)
+            on { type } doReturn(pipWindowTypePinned)
             on { isActive } doReturn(false)
             on { root } doReturn(null)
         }
