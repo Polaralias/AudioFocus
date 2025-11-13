@@ -4,7 +4,10 @@ import com.polaralias.audiofocus.data.OverlayFillMode
 import com.polaralias.audiofocus.data.OverlayPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class OverlayColorAnalyzerTest {
 
     @Test
