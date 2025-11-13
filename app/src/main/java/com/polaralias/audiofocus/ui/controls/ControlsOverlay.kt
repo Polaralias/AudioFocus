@@ -138,13 +138,21 @@ fun ControlsOverlay(
             }
             Slider(
                 value = sliderValue,
-                onValueChange = {
-                    if (state.canSeek) {
-                        onSeekTo(it.roundToInt().toLong())
+                onValueChange = { newValue ->
+                    if (state.canSeek && sliderRangeMax > 0f) {
+                        val target = newValue.roundToInt().toLong()
+                        if (state.canSeekTo) {
+                            onSeekTo(target)
+                        } else if (state.requiresSeekByFallback) {
+                            val delta = target - state.clampedPosition
+                            if (delta != 0L) {
+                                onSeekBy(delta)
+                            }
+                        }
                     }
                 },
                 valueRange = 0f..sliderRangeMax,
-                enabled = state.canSeek && sliderRangeMax > 0f,
+                enabled = state.isPlaying && state.canSeek && sliderRangeMax > 0f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = contentColor,
