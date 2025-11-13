@@ -101,10 +101,23 @@ object PolicyEngine {
         val hasVideoSurface = info.hasVisibleVideoSurface
         val relaxedSignal = windowState in RELAXED_VIDEO_STATES
         val classification = classifyYouTubeMusicVideo(metadata)
-        val isVideo = when (classification) {
-            VideoClassification.VIDEO -> hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE
-            VideoClassification.AUDIO -> false
-            VideoClassification.UNKNOWN -> hasVideoSurface || relaxedSignal || windowState == WindowState.FULLSCREEN
+        val heuristicVideoSignal = hasVideoSurface || relaxedSignal || windowState == WindowState.FULLSCREEN
+        val isVideo = when (classification.category) {
+            VideoClassification.VIDEO ->
+                hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE || relaxedSignal
+            VideoClassification.AUDIO -> {
+                if (!classification.metadataTrusted && heuristicVideoSignal) {
+                    Log.d(
+                        TAG,
+                        "YouTube Music metadata reported audio but heuristics detected video cues (state=$windowState, " +
+                            "hasSurface=$hasVideoSurface)"
+                    )
+                    heuristicVideoSignal
+                } else {
+                    false
+                }
+            }
+            VideoClassification.UNKNOWN -> heuristicVideoSignal
         }
 
         if (!isVideo) {
@@ -143,20 +156,34 @@ object PolicyEngine {
 
     private fun classifyYouTubeMusicVideo(
         metadata: android.media.MediaMetadata?,
-    ): VideoClassification {
+    ): YouTubeMusicVideoClassification {
         if (metadata == null) {
             Log.d(TAG, "YouTube Music metadata unavailable; falling back to relaxed heuristics")
-            return VideoClassification.UNKNOWN
+            return YouTubeMusicVideoClassification(VideoClassification.UNKNOWN, metadataTrusted = false)
         }
+
+        val hasWidthKey = metadata.containsKey(METADATA_KEY_VIDEO_WIDTH)
+        val hasHeightKey = metadata.containsKey(METADATA_KEY_VIDEO_HEIGHT)
+        val hasPresentationKey = metadata.containsKey(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
+        val metadataTrusted = hasWidthKey || hasHeightKey || hasPresentationKey
+
         val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
         val height = metadata.getLong(METADATA_KEY_VIDEO_HEIGHT)
         val presentationType = metadata.getLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
         val isVideo = (width > 0 && height > 0) || presentationType == PRESENTATION_DISPLAY_TYPE_VIDEO
+        val category = when {
+            isVideo -> VideoClassification.VIDEO
+            metadataTrusted -> VideoClassification.AUDIO
+            else -> VideoClassification.UNKNOWN
+        }
+
         Log.d(
             TAG,
-            "YouTube Music metadata video check: width=$width height=$height presentation=$presentationType -> $isVideo"
+            "YouTube Music metadata video check: width=$width height=$height presentation=$presentationType " +
+                "trusted=$metadataTrusted -> $category"
         )
-        return if (isVideo) VideoClassification.VIDEO else VideoClassification.AUDIO
+
+        return YouTubeMusicVideoClassification(category, metadataTrusted = metadataTrusted)
     }
 
     private enum class PlaybackActivity {
@@ -164,6 +191,11 @@ object PolicyEngine {
         PAUSED,
         STOPPED,
     }
+
+    private data class YouTubeMusicVideoClassification(
+        val category: VideoClassification,
+        val metadataTrusted: Boolean,
+    )
 
     private enum class VideoClassification {
         VIDEO,
