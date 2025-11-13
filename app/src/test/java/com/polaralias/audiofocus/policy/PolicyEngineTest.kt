@@ -154,6 +154,45 @@ class PolicyEngineTest {
     }
 
     @Test
+    fun youtubeMusicFullscreenWithEmptyMetadataUsesSurfaceSignal() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = emptyMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.FULLSCREEN,
+                hasVideoSurface = true,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
+    fun youtubeMusicMiniplayerWithEmptyMetadataUsesSurfaceSignal() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = emptyMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                hasVideoSurface = true,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(
+            OverlayState.Partial(heightRatio = 0.8f),
+            result
+        )
+    }
+
+    @Test
     fun youtubeMusicPiPVideoShowsPartialOverlayEvenWithoutSurface() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
@@ -302,6 +341,10 @@ class PolicyEngineTest {
             .putLong(METADATA_KEY_VIDEO_HEIGHT, 0)
             .putLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE, 0)
             .build()
+    }
+
+    private fun emptyMetadata(): MediaMetadata {
+        return MediaMetadata.Builder().build()
     }
 
     companion object {
