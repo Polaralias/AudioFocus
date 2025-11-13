@@ -10,15 +10,51 @@ import org.json.JSONObject
 
 class WindowHeuristics(context: Context) {
     private val heuristics: VideoHeuristics = loadHeuristics(context)
+    private val lastKnownPackageByWindowId = mutableMapOf<Int, String>()
+    private var lastKnownFocusedPackage: String? = null
 
     fun evaluate(windows: List<AccessibilityWindowInfo>?, metrics: DisplayMetrics): WindowInfo {
         if (windows.isNullOrEmpty()) return WindowInfo.Empty
 
         val bestByPackage = mutableMapOf<String, WindowCandidate>()
         var focusedPackage: String? = null
+        val observedWindowIds = mutableSetOf<Int>()
 
         windows.forEach { window ->
-            val root = window.root ?: return@forEach
+            val windowId = window.id
+            observedWindowIds += windowId
+
+            val bounds = Rect().also(window::getBoundsInScreen)
+            val coverage = coverage(bounds, metrics)
+            val state = determineWindowState(window, coverage)
+
+            val root = window.root
+            if (root == null) {
+                if (state == WindowState.PICTURE_IN_PICTURE) {
+                    val fallbackPackage = lastKnownPackageByWindowId[windowId]
+                        ?: focusedPackage
+                        ?: lastKnownFocusedPackage
+                    if (!fallbackPackage.isNullOrEmpty() && fallbackPackage in SUPPORTED_PACKAGES) {
+                        if (window.isActive && focusedPackage == null) {
+                            focusedPackage = fallbackPackage
+                        }
+                        val candidate = WindowCandidate(
+                            info = AppWindowInfo(
+                                packageName = fallbackPackage,
+                                state = WindowState.PICTURE_IN_PICTURE,
+                                hasVisibleVideoSurface = true,
+                            ),
+                            coverage = coverage,
+                        )
+                        val existing = bestByPackage[fallbackPackage]
+                        if (existing == null || candidate.isBetterThan(existing)) {
+                            bestByPackage[fallbackPackage] = candidate
+                        }
+                        lastKnownPackageByWindowId[windowId] = fallbackPackage
+                    }
+                }
+                return@forEach
+            }
             try {
                 val packageName = root.packageName?.toString()
                 if (packageName.isNullOrEmpty()) {
@@ -32,10 +68,6 @@ class WindowHeuristics(context: Context) {
                 if (packageName !in SUPPORTED_PACKAGES) {
                     return@forEach
                 }
-
-                val bounds = Rect().also(window::getBoundsInScreen)
-                val coverage = coverage(bounds, metrics)
-                val state = determineWindowState(window, coverage)
 
                 val likelyVideoSurface by lazy { hasLikelyVideoSurface(root) }
                 val assumeVideoSurface = when (state) {
@@ -73,14 +105,20 @@ class WindowHeuristics(context: Context) {
                 if (existing == null || candidate.isBetterThan(existing)) {
                     bestByPackage[packageName] = candidate
                 }
+                lastKnownPackageByWindowId[windowId] = packageName
             } finally {
                 root.recycle()
             }
         }
 
         if (bestByPackage.isEmpty()) {
+            lastKnownFocusedPackage = focusedPackage ?: lastKnownFocusedPackage
+            lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
             return WindowInfo.Empty
         }
+
+        lastKnownFocusedPackage = focusedPackage ?: lastKnownFocusedPackage
+        lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
 
         return WindowInfo(
             focusedPackage = focusedPackage,
