@@ -104,10 +104,11 @@ class PreferencesRepository(private val context: Context) {
     }
 
     suspend fun setOverlayColor(color: Int) {
-        Log.i(TAG, "Setting overlay color to ${String.format("%08X", color)}")
+        val opaqueColor = ensureOpaque(color)
+        Log.i(TAG, "Setting overlay color to ${String.format("%08X", opaqueColor)}")
         try {
             context.dataStore.edit { prefs ->
-                prefs[overlayColorKey] = color
+                prefs[overlayColorKey] = opaqueColor
                 prefs[overlayFillModeKey] = OverlayFillMode.SOLID_COLOR.name
                 prefs.remove(overlayImageUriKey)
             }
@@ -175,3 +176,5 @@ class PreferencesRepository(private val context: Context) {
         }
     }
 }
+
+private fun ensureOpaque(color: Int): Int = color or 0xFF000000.toInt()

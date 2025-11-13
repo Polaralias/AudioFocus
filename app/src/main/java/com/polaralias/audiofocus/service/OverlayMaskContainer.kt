@@ -35,15 +35,17 @@ class OverlayMaskContainer(context: Context) : FrameLayout(context) {
     fun applyPreferences(scope: CoroutineScope, preferences: OverlayPreferences) {
         loadJob?.cancel()
         clearImage()
+        val fallbackColor = ensureOpaque(preferences.overlayColor)
+
         when (preferences.fillMode) {
             OverlayFillMode.SOLID_COLOR -> {
-                setBackgroundColor(preferences.overlayColor)
+                setBackgroundColor(fallbackColor)
             }
 
             OverlayFillMode.IMAGE -> {
                 val uri = preferences.imageUri
                 if (uri == null) {
-                    setBackgroundColor(preferences.overlayColor)
+                    setBackgroundColor(fallbackColor)
                     return
                 }
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -54,7 +56,7 @@ class OverlayMaskContainer(context: Context) : FrameLayout(context) {
                             imageView.setImageBitmap(bitmap)
                             imageView.visibility = VISIBLE
                         } else {
-                            setBackgroundColor(preferences.overlayColor)
+                            setBackgroundColor(fallbackColor)
                         }
                         loadJob = null
                     }
@@ -93,5 +95,9 @@ class OverlayMaskContainer(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val TAG = "OverlayMaskContainer"
+
+        private fun ensureOpaque(color: Int): Int {
+            return color or 0xFF000000.toInt()
+        }
     }
 }

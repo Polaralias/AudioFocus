@@ -25,11 +25,12 @@ class PreferencesRepositoryTest {
         assertEquals(repository.overlayDefaultColor, defaults.overlayColor)
         assertNull(defaults.imageUri)
 
-        val customColor = 0xFFAABBCC.toInt()
-        repository.setOverlayColor(customColor)
+        val translucentColor = 0x12AABBCC
+        repository.setOverlayColor(translucentColor)
         val colorPrefs = repository.current()
         assertEquals(OverlayFillMode.SOLID_COLOR, colorPrefs.fillMode)
-        assertEquals(customColor, colorPrefs.overlayColor)
+        val expectedOpaqueColor = 0xFFAABBCC.toInt()
+        assertEquals(expectedOpaqueColor, colorPrefs.overlayColor)
         assertNull(colorPrefs.imageUri)
 
         val testUri = Uri.parse("content://com.polaralias.audiofocus.test/image")
@@ -42,6 +43,6 @@ class PreferencesRepositoryTest {
         val cleared = repository.current()
         assertEquals(OverlayFillMode.SOLID_COLOR, cleared.fillMode)
         assertNull(cleared.imageUri)
-        assertEquals(customColor, cleared.overlayColor)
+        assertEquals(expectedOpaqueColor, cleared.overlayColor)
     }
 }
