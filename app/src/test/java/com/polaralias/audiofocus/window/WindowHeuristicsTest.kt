@@ -17,6 +17,8 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 
+private const val TYPE_PINNED = 4 // Matches WindowHeuristics.determineWindowState PiP type check
+
 @RunWith(RobolectricTestRunner::class)
 class WindowHeuristicsTest {
 
@@ -34,11 +36,9 @@ class WindowHeuristicsTest {
             packageName = "com.google.android.youtube"
         }
 
-        val pipWindowTypePinned = 4 // Matches WindowHeuristics.determineWindowState PiP type check
-
         val pipWindowWithRoot = mock<AccessibilityWindowInfo> {
             on { id } doReturn(1)
-            on { type } doReturn(pipWindowTypePinned)
+            on { type } doReturn(TYPE_PINNED)
             on { isActive } doReturn(false)
             on { root } doReturn(rootNode)
         }
@@ -52,7 +52,7 @@ class WindowHeuristicsTest {
 
         val pipWindowWithoutRoot = mock<AccessibilityWindowInfo> {
             on { id } doReturn(1)
-            on { type } doReturn(pipWindowTypePinned)
+            on { type } doReturn(TYPE_PINNED)
             on { isActive } doReturn(false)
             on { root } doReturn(null)
         }
