@@ -13,9 +13,10 @@ interface TransportCommander {
 
 class MediaTransportCommander(
     private val controller: MediaController,
-    private val playbackState: PlaybackState?
+    private val playbackState: PlaybackState?,
+    controls: MediaController.TransportControls? = null
 ) : TransportCommander {
-    private val controls = controller.transportControls
+    private val controls = controls ?: controller.transportControls
     private val actions: Long = playbackState?.actions ?: 0L
 
     override fun togglePlayPause() {
