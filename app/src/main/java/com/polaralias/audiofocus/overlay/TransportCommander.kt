@@ -46,6 +46,9 @@ class MediaTransportCommander(
     }
 
     private fun trySeekTo(positionMs: Long): Boolean {
+        if (actions and PlaybackState.ACTION_SEEK_TO == 0L) {
+            return false
+        }
         return try {
             controls.seekTo(positionMs)
             true
