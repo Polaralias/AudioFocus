@@ -52,6 +52,9 @@ class MediaTransportCommander(
         } catch (error: SecurityException) {
             Log.w(TAG, "Transport denied seekTo", error)
             false
+        } catch (error: UnsupportedOperationException) {
+            Log.w(TAG, "Transport does not implement seekTo", error)
+            false
         } catch (error: IllegalArgumentException) {
             Log.w(TAG, "Transport rejected seekTo", error)
             false

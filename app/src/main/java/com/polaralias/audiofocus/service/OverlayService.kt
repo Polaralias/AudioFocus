@@ -529,6 +529,7 @@ class OverlayService : LifecycleService() {
         val supportsRelativeSeek =
             actions and android.media.session.PlaybackState.ACTION_FAST_FORWARD != 0L ||
                 actions and android.media.session.PlaybackState.ACTION_REWIND != 0L
+        val canSeekRelativeOnly = !supportsSeekTo && supportsRelativeSeek
         val position = computePosition(playback, isPlaying)
         latestDuration = if (playback != null || metadata != null) {
             resolveDuration(metadata, playback, latestDuration, position)
@@ -545,6 +546,7 @@ class OverlayService : LifecycleService() {
             canSeek = hasProgress,
             canSeekTo = supportsSeekTo,
             canSeekBy = supportsSeekTo || supportsRelativeSeek,
+            canSeekRelativeOnly = canSeekRelativeOnly,
             isPartialOverlay = overlayState is OverlayState.Partial,
             overlayFillMode = preferences.fillMode,
             overlayColor = preferences.overlayColor,

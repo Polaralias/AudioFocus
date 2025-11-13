@@ -130,12 +130,13 @@ fun ControlsOverlay(
                 }
             }
             Spacer(modifier = Modifier.height(spacerHeight))
-            val sliderRangeMax = remember(state.position, state.duration) {
-                maxOf(state.safeDuration, state.clampedPosition).toFloat().coerceAtLeast(0f)
+            val sliderRangeMax = maxOf(state.safeDuration, state.clampedPosition).toFloat().coerceAtLeast(0f)
+            val sliderValue = if (sliderRangeMax <= 0f) {
+                0f
+            } else {
+                state.clampedPosition.toFloat().coerceIn(0f, sliderRangeMax)
             }
-            val sliderValue = remember(state.clampedPosition, sliderRangeMax) {
-                if (sliderRangeMax <= 0f) 0f else state.clampedPosition.toFloat().coerceIn(0f, sliderRangeMax)
-            }
+            val sliderEnabled = state.isPlaying && state.canSeek && sliderRangeMax > 0f
             Slider(
                 value = sliderValue,
                 onValueChange = { newValue ->
@@ -152,7 +153,7 @@ fun ControlsOverlay(
                     }
                 },
                 valueRange = 0f..sliderRangeMax,
-                enabled = state.isPlaying && state.canSeek && sliderRangeMax > 0f,
+                enabled = sliderEnabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = contentColor,
