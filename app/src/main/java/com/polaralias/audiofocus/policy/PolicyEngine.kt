@@ -104,7 +104,7 @@ object PolicyEngine {
         val heuristicVideoSignal = hasVideoSurface || relaxedSignal || windowState == WindowState.FULLSCREEN
         val isVideo = when (classification.category) {
             VideoClassification.VIDEO ->
-                hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE || relaxedSignal
+                hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE
             VideoClassification.AUDIO -> {
                 if (!classification.metadataTrusted && heuristicVideoSignal) {
                     Log.d(
