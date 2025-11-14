@@ -48,7 +48,7 @@ class OverlayMaskContainer(context: Context) : FrameLayout(context) {
                     setBackgroundColor(fallbackColor)
                     return
                 }
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setBackgroundColor(fallbackColor)
                 loadJob = scope.launch {
                     val bitmap = loadBitmap(uri)
                     withContext(Dispatchers.Main) {
