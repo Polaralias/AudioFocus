@@ -130,17 +130,24 @@ fun ControlsOverlay(
                 }
             }
             Spacer(modifier = Modifier.height(spacerHeight))
-            val sliderRangeMax = maxOf(state.safeDuration, state.clampedPosition).toFloat().coerceAtLeast(0f)
+            val sliderRangeMax = run {
+                val base = maxOf(state.safeDuration, state.clampedPosition).toFloat().coerceAtLeast(0f)
+                when {
+                    base > 0f -> base
+                    state.canSeekBy -> RELATIVE_SEEK_SLIDER_RANGE
+                    else -> 0f
+                }
+            }
             val sliderValue = if (sliderRangeMax <= 0f) {
                 0f
             } else {
                 state.clampedPosition.toFloat().coerceIn(0f, sliderRangeMax)
             }
-            val sliderEnabled = state.isPlaying && state.canSeek && sliderRangeMax > 0f
+            val sliderEnabled = state.canSeekBy || (state.isPlaying && state.canSeek && sliderRangeMax > 0f)
             Slider(
                 value = sliderValue,
                 onValueChange = { newValue ->
-                    if (state.canSeek && sliderRangeMax > 0f) {
+                    if (state.canSeekBy || (state.canSeek && sliderRangeMax > 0f)) {
                         val target = newValue.roundToInt().toLong()
                         if (state.canSeekTo) {
                             onSeekTo(target)
@@ -182,6 +189,8 @@ fun ControlsOverlay(
         }
     }
 }
+
+private const val RELATIVE_SEEK_SLIDER_RANGE = 10_000f
 
 private fun formatTimestamp(millis: Long): String {
     if (millis <= 0L) return "0:00"

@@ -179,4 +179,42 @@ class ControlsOverlayTest {
             )
         )
     }
+
+    @Test
+    fun sliderRemainsEnabledWhenOnlyRelativeSeekingAvailableWithoutProgress() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            AudioFocusTheme {
+                ControlsOverlay(
+                    state = ControlsUiState(
+                        isVisible = true,
+                        isPlaying = false,
+                        position = 0L,
+                        duration = 0L,
+                        canSeek = false,
+                        canSeekTo = false,
+                        canSeekBy = true,
+                        canSeekRelativeOnly = true
+                    ),
+                    onTogglePlayPause = { events.add("toggle") },
+                    onSeekBy = { events.add("seekBy:$it") },
+                    onSeekTo = { events.add("seekTo:$it") }
+                )
+            }
+        }
+
+        val slider = composeRule.onNodeWithRole(Role.Slider)
+        slider.assertIsEnabled()
+        slider.assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(0f, 0f..10_000f, 0)
+            )
+        )
+
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { action -> action(10_000f) }
+
+        assertTrue(events.any { it == "seekBy:10000" })
+        assertTrue(events.none { it.startsWith("seekTo:") })
+    }
 }

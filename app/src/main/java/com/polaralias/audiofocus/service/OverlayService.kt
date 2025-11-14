@@ -526,9 +526,12 @@ class OverlayService : LifecycleService() {
         val isPlaying = mediaState is MediaState.Playing
         val actions = playback?.actions ?: 0L
         val supportsSeekTo = actions and android.media.session.PlaybackState.ACTION_SEEK_TO != 0L
-        val supportsRelativeSeek =
-            actions and android.media.session.PlaybackState.ACTION_FAST_FORWARD != 0L ||
-                actions and android.media.session.PlaybackState.ACTION_REWIND != 0L
+        val supportsRelativeSeek = actions.hasAny(
+            android.media.session.PlaybackState.ACTION_FAST_FORWARD,
+            android.media.session.PlaybackState.ACTION_REWIND,
+            android.media.session.PlaybackState.ACTION_SEEK_FORWARD,
+            android.media.session.PlaybackState.ACTION_SEEK_BACKWARD
+        )
         val canSeekRelativeOnly = !supportsSeekTo && supportsRelativeSeek
         val position = computePosition(playback, isPlaying)
         latestDuration = if (playback != null || metadata != null) {
@@ -595,6 +598,8 @@ class OverlayService : LifecycleService() {
             }
         }
     }
+
+    private fun Long.hasAny(vararg flags: Long): Boolean = flags.any { flag -> this and flag != 0L }
     
     /**
      * Attach overlay views to WindowManager early (onCreate).
