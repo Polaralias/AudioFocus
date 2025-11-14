@@ -70,4 +70,65 @@ class WindowHeuristicsTest {
         assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
         assertTrue(entry.hasVisibleVideoSurface)
     }
+
+    @Test
+    fun evaluate_doesNotOverwriteFocusWithUnsupportedPackage() {
+        val heuristics = WindowHeuristics(context)
+
+        val youtubeRoot = AccessibilityNodeInfo.obtain().apply {
+            packageName = "com.google.android.youtube"
+        }
+
+        val initialPipWindow = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(1)
+            on { type } doReturn(TYPE_PINNED)
+            on { isActive } doReturn(false)
+            on { root } doReturn(youtubeRoot)
+        }
+        whenever(initialPipWindow.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, 200, 200)
+            null
+        }
+
+        heuristics.evaluate(listOf(initialPipWindow), metrics)
+
+        val unsupportedRoot = AccessibilityNodeInfo.obtain().apply {
+            packageName = "com.example.unsupported"
+        }
+
+        val unsupportedWindow = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(2)
+            on { type } doReturn(1)
+            on { isActive } doReturn(true)
+            on { root } doReturn(unsupportedRoot)
+        }
+        whenever(unsupportedWindow.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, metrics.widthPixels, metrics.heightPixels)
+            null
+        }
+
+        val pipWindowWithoutRoot = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(1)
+            on { type } doReturn(TYPE_PINNED)
+            on { isActive } doReturn(false)
+            on { root } doReturn(null)
+        }
+        whenever(pipWindowWithoutRoot.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, 200, 200)
+            null
+        }
+
+        val result = heuristics.evaluate(listOf(unsupportedWindow, pipWindowWithoutRoot), metrics)
+
+        val entry = result.appWindows["com.google.android.youtube"]
+
+        assertNotNull(entry)
+        entry!!
+        assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
+        assertTrue(entry.hasVisibleVideoSurface)
+        assertEquals(null, result.focusedPackage)
+    }
 }
