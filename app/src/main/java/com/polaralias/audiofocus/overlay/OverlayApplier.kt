@@ -7,6 +7,9 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import com.polaralias.audiofocus.data.OverlayDefaults
+import com.polaralias.audiofocus.data.PreferencesRepository
+import kotlinx.coroutines.runBlocking
 
 class OverlayApplier(
     private val context: Context,
@@ -69,7 +72,17 @@ class OverlayApplier(
     }
 
     companion object {
-        private fun defaultOverlayView(context: Context): View =
-            FrameLayout(context).apply { setBackgroundColor(0x33000000) }
+        private fun defaultOverlayView(context: Context): View {
+            val overlayColor = runCatching {
+                runBlocking {
+                    PreferencesRepository(context.applicationContext).current().overlayColor
+                }
+            }.getOrElse { OverlayDefaults.defaultColor }
+            val opaqueColor = overlayColor or 0xFF000000.toInt()
+            return FrameLayout(context).apply {
+                alpha = 1f
+                setBackgroundColor(opaqueColor)
+            }
+        }
     }
 }
