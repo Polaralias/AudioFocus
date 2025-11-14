@@ -59,6 +59,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// These constants are not present in earlier Android SDKs. Add them if missing:
+private const val ACTION_SEEK_FORWARD: Long = 0x200000L // 2097152L
+private const val ACTION_SEEK_BACKWARD: Long = 0x400000L // 4194304L
+
 private object PlaybackStateExtras {
     private const val EXTRA_DURATION_COMPAT = "android.media.playbackstate.extra.DURATION"
     private const val EXTRA_DURATION_STANDARD = "android.media.extra.DURATION"
@@ -529,8 +533,8 @@ class OverlayService : LifecycleService() {
         val supportsRelativeSeek = actions.hasAny(
             android.media.session.PlaybackState.ACTION_FAST_FORWARD,
             android.media.session.PlaybackState.ACTION_REWIND,
-            android.media.session.PlaybackState.ACTION_SEEK_FORWARD,
-            android.media.session.PlaybackState.ACTION_SEEK_BACKWARD
+            ACTION_SEEK_FORWARD,
+            ACTION_SEEK_BACKWARD
         )
         val canSeekRelativeOnly = !supportsSeekTo && supportsRelativeSeek
         val position = computePosition(playback, isPlaying)
