@@ -60,8 +60,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 // These constants are not present in earlier Android SDKs. Add them if missing:
-private const val ACTION_SEEK_FORWARD: Long = 0x200000L // 2097152L
-private const val ACTION_SEEK_BACKWARD: Long = 0x400000L // 4194304L
+internal const val ACTION_SEEK_FORWARD: Long = 0x200000L // 2097152L
+internal const val ACTION_SEEK_BACKWARD: Long = 0x400000L // 4194304L
 
 private object PlaybackStateExtras {
     private const val EXTRA_DURATION_COMPAT = "android.media.playbackstate.extra.DURATION"
@@ -529,14 +529,11 @@ class OverlayService : LifecycleService() {
         latestPlaybackState = playback
         val isPlaying = mediaState is MediaState.Playing
         val actions = playback?.actions ?: 0L
-        val supportsSeekTo = actions and android.media.session.PlaybackState.ACTION_SEEK_TO != 0L
-        val supportsRelativeSeek = actions.hasAny(
-            android.media.session.PlaybackState.ACTION_FAST_FORWARD,
-            android.media.session.PlaybackState.ACTION_REWIND,
-            ACTION_SEEK_FORWARD,
-            ACTION_SEEK_BACKWARD
+        val capabilities = resolveSeekCapabilities(
+            actions = actions,
+            hasCommander = commander != null,
+            hasPlayback = playback != null
         )
-        val canSeekRelativeOnly = !supportsSeekTo && supportsRelativeSeek
         val position = computePosition(playback, isPlaying)
         latestDuration = if (playback != null || metadata != null) {
             resolveDuration(metadata, playback, latestDuration, position)
@@ -551,9 +548,9 @@ class OverlayService : LifecycleService() {
             position = position,
             duration = latestDuration,
             canSeek = hasProgress,
-            canSeekTo = supportsSeekTo,
-            canSeekBy = supportsSeekTo || supportsRelativeSeek,
-            canSeekRelativeOnly = canSeekRelativeOnly,
+            canSeekTo = capabilities.supportsSeekTo,
+            canSeekBy = capabilities.canSeekBy,
+            canSeekRelativeOnly = capabilities.canSeekRelativeOnly,
             isPartialOverlay = overlayState is OverlayState.Partial,
             overlayFillMode = preferences.fillMode,
             overlayColor = preferences.overlayColor,
@@ -603,8 +600,6 @@ class OverlayService : LifecycleService() {
         }
     }
 
-    private fun Long.hasAny(vararg flags: Long): Boolean = flags.any { flag -> this and flag != 0L }
-    
     /**
      * Attach overlay views to WindowManager early (onCreate).
      * NEW BEHAVIOR: Views are attached once and kept attached (like AudioFocus_old).
