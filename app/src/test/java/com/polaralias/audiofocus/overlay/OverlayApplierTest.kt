@@ -34,6 +34,6 @@ class OverlayApplierTest {
         val method = OverlayApplier.Companion::class.java
             .getDeclaredMethod("defaultOverlayView", Context::class.java)
         method.isAccessible = true
-        return method.invoke(null, context) as View
+        return method.invoke(OverlayApplier.Companion, context) as View
     }
 }
