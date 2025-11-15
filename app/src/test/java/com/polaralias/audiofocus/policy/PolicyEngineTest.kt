@@ -214,7 +214,7 @@ class PolicyEngineTest {
     }
 
     @Test
-    fun youtubeMusicPiPAudioHidesOverlay() {
+    fun youtubeMusicPiPAudioMetadataUsesPartialOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
@@ -228,11 +228,14 @@ class PolicyEngineTest {
         )
 
         val result = PolicyEngine.compute(input)
-        assertEquals(OverlayState.None, result)
+        assertEquals(
+            OverlayState.Partial(heightRatio = 0.8f),
+            result
+        )
     }
 
     @Test
-    fun youtubeMusicAudioOnlyHidesOverlay() {
+    fun youtubeMusicAudioMetadataWithSurfaceUsesPartialOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
@@ -246,7 +249,10 @@ class PolicyEngineTest {
         )
 
         val result = PolicyEngine.compute(input)
-        assertEquals(OverlayState.None, result)
+        assertEquals(
+            OverlayState.Partial(heightRatio = 0.8f),
+            result
+        )
     }
 
     @Test
