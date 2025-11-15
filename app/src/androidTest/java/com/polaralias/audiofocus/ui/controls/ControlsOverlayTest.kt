@@ -102,6 +102,7 @@ class ControlsOverlayTest {
     @Test
     fun sliderFallsBackToSeekByWhenSeekToUnavailable() {
         val events = mutableListOf<String>()
+        var seekToAttempts = 0
         composeRule.setContent {
             AudioFocusTheme {
                 ControlsOverlay(
@@ -117,7 +118,10 @@ class ControlsOverlayTest {
                     ),
                     onTogglePlayPause = { events.add("toggle") },
                     onSeekBy = { events.add("seekBy:$it") },
-                    onSeekTo = { events.add("seekTo:$it") }
+                    onSeekTo = {
+                        seekToAttempts++
+                        throw UnsupportedOperationException("seekTo unavailable")
+                    }
                 )
             }
         }
@@ -125,6 +129,7 @@ class ControlsOverlayTest {
         composeRule.onNodeWithRole(Role.Slider)
             .performSemanticsAction(SemanticsActions.SetProgress) { action -> action(6_000f) }
 
+        assertTrue(seekToAttempts > 0)
         assertTrue(events.any { it == "seekBy:4000" })
         assertTrue(events.none { it.startsWith("seekTo:") })
     }
@@ -132,6 +137,7 @@ class ControlsOverlayTest {
     @Test
     fun sliderEnabledAndUpdatesWithRelativeSeekOnly() {
         val events = mutableListOf<String>()
+        var seekToAttempts = 0
         var state by mutableStateOf(
             ControlsUiState(
                 isVisible = true,
@@ -150,7 +156,10 @@ class ControlsOverlayTest {
                     state = state,
                     onTogglePlayPause = { events.add("toggle") },
                     onSeekBy = { events.add("seekBy:$it") },
-                    onSeekTo = { events.add("seekTo:$it") }
+                    onSeekTo = {
+                        seekToAttempts++
+                        throw UnsupportedOperationException("seekTo unavailable")
+                    }
                 )
             }
         }
@@ -166,6 +175,7 @@ class ControlsOverlayTest {
 
         slider.performSemanticsAction(SemanticsActions.SetProgress) { action -> action(8_000f) }
 
+        assertTrue(seekToAttempts > 0)
         assertTrue(events.any { it == "seekBy:6000" })
 
         composeRule.runOnUiThread {
@@ -183,6 +193,7 @@ class ControlsOverlayTest {
     @Test
     fun sliderRemainsEnabledWhenOnlyRelativeSeekingAvailableWithoutProgress() {
         val events = mutableListOf<String>()
+        var seekToAttempts = 0
         composeRule.setContent {
             AudioFocusTheme {
                 ControlsOverlay(
@@ -198,7 +209,10 @@ class ControlsOverlayTest {
                     ),
                     onTogglePlayPause = { events.add("toggle") },
                     onSeekBy = { events.add("seekBy:$it") },
-                    onSeekTo = { events.add("seekTo:$it") }
+                    onSeekTo = {
+                        seekToAttempts++
+                        throw UnsupportedOperationException("seekTo unavailable")
+                    }
                 )
             }
         }
@@ -214,7 +228,37 @@ class ControlsOverlayTest {
 
         slider.performSemanticsAction(SemanticsActions.SetProgress) { action -> action(10_000f) }
 
+        assertTrue(seekToAttempts > 0)
         assertTrue(events.any { it == "seekBy:10000" })
         assertTrue(events.none { it.startsWith("seekTo:") })
+    }
+
+    @Test
+    fun sliderInvokesSeekToWhenActionsMissing() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            AudioFocusTheme {
+                ControlsOverlay(
+                    state = ControlsUiState(
+                        isVisible = true,
+                        isPlaying = true,
+                        position = 2_000L,
+                        duration = 12_000L,
+                        canSeek = true,
+                        canSeekTo = false,
+                        canSeekBy = false
+                    ),
+                    onTogglePlayPause = { events.add("toggle") },
+                    onSeekBy = { events.add("seekBy:$it") },
+                    onSeekTo = { events.add("seekTo:$it") }
+                )
+            }
+        }
+
+        composeRule.onNodeWithRole(Role.Slider)
+            .performSemanticsAction(SemanticsActions.SetProgress) { action -> action(6_000f) }
+
+        assertTrue(events.any { it == "seekTo:6000" })
+        assertTrue(events.none { it.startsWith("seekBy:") })
     }
 }

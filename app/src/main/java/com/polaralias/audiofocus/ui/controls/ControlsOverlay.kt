@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import android.graphics.Color as AndroidColor
+import android.util.Log
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Slider
@@ -33,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import kotlin.coroutines.cancellation.CancellationException
 import com.polaralias.audiofocus.data.OverlayFillMode
 import kotlin.math.roundToInt
 import com.polaralias.audiofocus.R
@@ -147,15 +149,24 @@ fun ControlsOverlay(
             Slider(
                 value = sliderValue,
                 onValueChange = { newValue ->
-                    if (state.canSeekBy || (state.canSeek && sliderRangeMax > 0f)) {
-                        val target = newValue.roundToInt().toLong()
-                        if (state.canSeekTo) {
+                    if (!sliderEnabled) return@Slider
+                    val target = newValue.roundToInt().toLong()
+                    var handled = false
+                    if (sliderRangeMax > 0f) {
+                        handled = try {
                             onSeekTo(target)
-                        } else if (state.requiresSeekByFallback) {
-                            val delta = target - state.clampedPosition
-                            if (delta != 0L) {
-                                onSeekBy(delta)
-                            }
+                            true
+                        } catch (error: Exception) {
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "onSeekTo failed", error)
+                            false
+                        }
+                    }
+                    if (!handled && state.canSeekBy) {
+                        val delta = target - state.clampedPosition
+                        if (delta != 0L) {
+                            handled = true
+                            onSeekBy(delta)
                         }
                     }
                 },
@@ -191,6 +202,7 @@ fun ControlsOverlay(
 }
 
 private const val RELATIVE_SEEK_SLIDER_RANGE = 10_000f
+private const val TAG = "ControlsOverlay"
 
 private fun formatTimestamp(millis: Long): String {
     if (millis <= 0L) return "0:00"
