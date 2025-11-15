@@ -165,15 +165,24 @@ object PolicyEngine {
         val hasWidthKey = metadata.containsKey(METADATA_KEY_VIDEO_WIDTH)
         val hasHeightKey = metadata.containsKey(METADATA_KEY_VIDEO_HEIGHT)
         val hasPresentationKey = metadata.containsKey(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
-        val metadataTrusted = hasWidthKey || hasHeightKey || hasPresentationKey
 
         val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
         val height = metadata.getLong(METADATA_KEY_VIDEO_HEIGHT)
         val presentationType = metadata.getLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
-        val isVideo = (width > 0 && height > 0) || presentationType == PRESENTATION_DISPLAY_TYPE_VIDEO
+
+        val hasPositiveDimensions = width > 0 && height > 0
+        val isVideoPresentation = presentationType == PRESENTATION_DISPLAY_TYPE_VIDEO
+        val metadataTrusted = hasPositiveDimensions || isVideoPresentation
+
+        val reportedAudio = when {
+            hasPresentationKey && !isVideoPresentation -> true
+            (hasWidthKey || hasHeightKey) && !hasPositiveDimensions -> true
+            else -> false
+        }
+
         val category = when {
-            isVideo -> VideoClassification.VIDEO
-            metadataTrusted -> VideoClassification.AUDIO
+            hasPositiveDimensions || isVideoPresentation -> VideoClassification.VIDEO
+            reportedAudio -> VideoClassification.AUDIO
             else -> VideoClassification.UNKNOWN
         }
 
