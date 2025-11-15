@@ -61,11 +61,12 @@ class WindowHeuristics(context: Context) {
                     return@forEach
                 }
 
-                if (window.isActive && focusedPackage == null) {
+                val isSupportedPackage = packageName in SUPPORTED_PACKAGES
+                if (window.isActive && focusedPackage == null && isSupportedPackage) {
                     focusedPackage = packageName
                 }
 
-                if (packageName !in SUPPORTED_PACKAGES) {
+                if (!isSupportedPackage) {
                     return@forEach
                 }
 
@@ -111,17 +112,19 @@ class WindowHeuristics(context: Context) {
             }
         }
 
+        val supportedFocusedPackage = focusedPackage?.takeIf { it in SUPPORTED_PACKAGES }
+
         if (bestByPackage.isEmpty()) {
-            lastKnownFocusedPackage = focusedPackage ?: lastKnownFocusedPackage
+            lastKnownFocusedPackage = supportedFocusedPackage ?: lastKnownFocusedPackage
             lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
             return WindowInfo.Empty
         }
 
-        lastKnownFocusedPackage = focusedPackage ?: lastKnownFocusedPackage
+        lastKnownFocusedPackage = supportedFocusedPackage ?: lastKnownFocusedPackage
         lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
 
         return WindowInfo(
-            focusedPackage = focusedPackage,
+            focusedPackage = supportedFocusedPackage,
             appWindows = bestByPackage.mapValues { it.value.info },
         )
     }
