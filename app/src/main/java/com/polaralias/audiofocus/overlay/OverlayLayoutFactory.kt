@@ -2,45 +2,41 @@ package com.polaralias.audiofocus.overlay
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import com.polaralias.audiofocus.model.OverlayState
 
 object OverlayLayoutFactory {
-    private const val TAG = "OverlayLayoutFactory"
-
-    fun maskLayoutFor(context: Context, state: OverlayState): WindowManager.LayoutParams? {
-        return when (state) {
-            OverlayState.None -> {
-                Log.d(TAG, "No overlay state, returning null layout")
-                null
-            }
-            OverlayState.Fullscreen -> {
-                Log.d(TAG, "Creating fullscreen mask layout")
-                createMaskLayout(
-                    context,
-                    height = WindowManager.LayoutParams.MATCH_PARENT,
-                    gravity = Gravity.TOP
-                )
-            }
+    fun maskLayoutFor(context: Context, state: OverlayState): WindowManager.LayoutParams {
+        val blockTouches = when (state) {
+            OverlayState.None -> false
+            OverlayState.Fullscreen -> true
         }
+        return createMaskLayout(context, blockTouches)
     }
 
-    // Creates mask layout with FLAG_NOT_TOUCHABLE for full touch passthrough
-    // This ensures the overlay doesn't intercept any touch events
-    private fun createMaskLayout(context: Context, height: Int, gravity: Int): WindowManager.LayoutParams {
+    private fun createMaskLayout(
+        context: Context,
+        blockTouches: Boolean,
+    ): WindowManager.LayoutParams {
+        val baseFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+
+        val flags = if (blockTouches) {
+            baseFlags
+        } else {
+            baseFlags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            height,
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            flags,
             PixelFormat.OPAQUE
         ).apply {
-            this.gravity = gravity
+            gravity = Gravity.TOP
         }
     }
 

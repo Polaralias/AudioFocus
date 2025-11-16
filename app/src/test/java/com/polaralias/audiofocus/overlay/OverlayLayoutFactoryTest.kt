@@ -22,8 +22,13 @@ class OverlayLayoutFactoryTest {
     @Test
     fun fullscreenMaskUsesMatchParentHeight() {
         val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
-        assertNotNull(params)
-        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params!!.height)
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params.height)
+    }
+
+    @Test
+    fun maskLayoutUsesMatchParentWidth() {
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
+        assertEquals(WindowManager.LayoutParams.MATCH_PARENT, params.width)
     }
 
     @Test
@@ -50,15 +55,25 @@ class OverlayLayoutFactoryTest {
     @Test
     fun maskLayoutUsesOpaquePixelFormat() {
         val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
-        assertNotNull(params)
-        assertEquals(PixelFormat.OPAQUE, params!!.format)
+        assertEquals(PixelFormat.OPAQUE, params.format)
     }
 
     @Test
     fun maskLayoutIncludesLayoutNoLimitsFlag() {
         val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
-        assertNotNull(params)
-        assertTrue(params!!.flags and WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS != 0)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS != 0)
+    }
+
+    @Test
+    fun fullscreenMaskBlocksTouches() {
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0)
+    }
+
+    @Test
+    fun hiddenMaskAllowsTouchPassthrough() {
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.None)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
     }
 
     @Test
