@@ -188,36 +188,55 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             return PlaybackContentType.AUDIO_ONLY
         }
 
-        val key = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
+        val baseKey = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
             ?: metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
             ?: DEFAULT_YTM_CACHE_KEY
 
-        val contentType = contentTypeCache.getOrPut(key) {
-            val videoMetadata = YouTubeMusicMetadata.extractVideoMetadata(metadata)
-            when {
-                videoMetadata == null -> {
-                    Log.d(TAG, "YouTube Music: No video metadata hints, assuming audio-only")
-                    PlaybackContentType.AUDIO_ONLY
-                }
-                videoMetadata.indicatesVideo -> {
-                    Log.d(
-                        TAG,
-                        "YouTube Music: Video detected (width=${videoMetadata.videoWidth}, " +
-                            "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
-                    )
-                    PlaybackContentType.VIDEO
-                }
-                else -> {
-                    Log.d(
-                        TAG,
-                        "YouTube Music: Audio-only content (width=${videoMetadata.videoWidth}, " +
-                            "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
-                    )
-                    PlaybackContentType.AUDIO_ONLY
-                }
+        val videoMetadata = YouTubeMusicMetadata.extractVideoMetadata(metadata)
+        val contentType = when {
+            videoMetadata == null -> {
+                Log.d(TAG, "YouTube Music: No video metadata hints, assuming audio-only")
+                PlaybackContentType.AUDIO_ONLY
+            }
+            videoMetadata.indicatesVideo -> {
+                Log.d(
+                    TAG,
+                    "YouTube Music: Video detected (width=${videoMetadata.videoWidth}, " +
+                        "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
+                )
+                PlaybackContentType.VIDEO
+            }
+            else -> {
+                Log.d(
+                    TAG,
+                    "YouTube Music: Audio-only content (width=${videoMetadata.videoWidth}, " +
+                        "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
+                )
+                PlaybackContentType.AUDIO_ONLY
             }
         }
+
+        val cacheKey = buildYouTubeMusicCacheKey(baseKey, videoMetadata)
+        val cachedValue = contentTypeCache.get(cacheKey)
+        if (cachedValue != contentType) {
+            Log.d(TAG, "YouTube Music: Updating cached content type for $cacheKey to $contentType")
+        }
+        contentTypeCache.put(cacheKey, contentType)
+
         return contentType
+    }
+
+    private fun buildYouTubeMusicCacheKey(
+        baseKey: String,
+        videoMetadata: YouTubeMusicMetadata.VideoMetadata?,
+    ): String {
+        val modeHint = when {
+            videoMetadata == null -> "no_video_hint"
+            videoMetadata.indicatesVideo -> "video_mode"
+            else -> "audio_mode"
+        }
+        val presentationHint = videoMetadata?.presentationDisplayType ?: -1L
+        return "$baseKey#$modeHint#$presentationHint"
     }
 
     private fun extractSessionToken(sbn: StatusBarNotification): MediaSession.Token? {
