@@ -530,17 +530,14 @@ class OverlayService : LifecycleService() {
         latestPlaybackState = playback
         val isPlaying = mediaState is MediaState.Playing
         val actions = playback?.actions ?: 0L
-        val capabilities = resolveSeekCapabilities(
-            actions = actions,
-            hasCommander = commander != null,
-            hasPlayback = playback != null
-        )
+        val capabilities = resolveSeekCapabilities(actions)
         val position = computePosition(playback, isPlaying)
         latestDuration = if (playback != null || metadata != null) {
             resolveDuration(metadata, playback, latestDuration, position)
         } else {
             0L
         }
+        val sliderEnabled = latestDuration > 0L && (capabilities.supportsSeekTo || capabilities.supportsRelativeSeek)
         val hasProgress = (latestDuration > 0L) || (position > 0L)
         val colors = overlayColorScheme
         controlsState.value = ControlsUiState(
@@ -552,6 +549,7 @@ class OverlayService : LifecycleService() {
             canSeekTo = capabilities.supportsSeekTo,
             canSeekBy = capabilities.canSeekBy,
             canSeekRelativeOnly = capabilities.canSeekRelativeOnly,
+            isSliderEnabled = sliderEnabled,
             overlayFillMode = preferences.fillMode,
             overlayColor = preferences.overlayColor,
             overlayImageUri = preferences.imageUri,

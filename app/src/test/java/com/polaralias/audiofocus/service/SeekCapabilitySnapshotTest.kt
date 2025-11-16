@@ -8,41 +8,40 @@ import org.junit.Test
 class SeekCapabilitySnapshotTest {
 
     @Test
-    fun assumesSeekToWhenCommanderPresentWithoutActions() {
-        val snapshot = resolveSeekCapabilities(
-            actions = 0L,
-            hasCommander = true,
-            hasPlayback = true
-        )
+    fun doesNotAssumeSeekSupportWithoutActions() {
+        val snapshot = resolveSeekCapabilities(actions = 0L)
+
+        assertFalse(snapshot.supportsSeekTo)
+        assertFalse(snapshot.canSeekBy)
+        assertFalse(snapshot.canSeekRelativeOnly)
+    }
+
+    @Test
+    fun detectsSeekToWhenActionAdvertised() {
+        val snapshot = resolveSeekCapabilities(actions = PlaybackState.ACTION_SEEK_TO)
 
         assertTrue(snapshot.supportsSeekTo)
-        assertFalse(snapshot.canSeekRelativeOnly)
         assertTrue(snapshot.canSeekBy)
+        assertFalse(snapshot.canSeekRelativeOnly)
     }
 
     @Test
     fun detectsRelativeOnlySeekWhenSeekToNotAdvertised() {
         val snapshot = resolveSeekCapabilities(
-            actions = PlaybackState.ACTION_FAST_FORWARD or PlaybackState.ACTION_REWIND,
-            hasCommander = true,
-            hasPlayback = true
+            actions = PlaybackState.ACTION_FAST_FORWARD or PlaybackState.ACTION_REWIND
         )
 
-        assertTrue(snapshot.supportsSeekTo)
+        assertFalse(snapshot.supportsSeekTo)
         assertTrue(snapshot.canSeekRelativeOnly)
         assertTrue(snapshot.canSeekBy)
     }
 
     @Test
-    fun reportsNoSeekSupportWhenCommanderMissingAndNoActions() {
-        val snapshot = resolveSeekCapabilities(
-            actions = 0L,
-            hasCommander = false,
-            hasPlayback = true
-        )
+    fun treatsSeekForwardBackwardAsSeekToIndicators() {
+        val snapshot = resolveSeekCapabilities(actions = ACTION_SEEK_FORWARD)
 
-        assertFalse(snapshot.supportsSeekTo)
-        assertFalse(snapshot.canSeekBy)
+        assertTrue(snapshot.supportsSeekTo)
+        assertTrue(snapshot.supportsRelativeSeek)
         assertFalse(snapshot.canSeekRelativeOnly)
     }
 }
