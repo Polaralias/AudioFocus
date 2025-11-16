@@ -537,8 +537,8 @@ class OverlayService : LifecycleService() {
         } else {
             0L
         }
-        val sliderEnabled = latestDuration > 0L && (capabilities.supportsSeekTo || capabilities.supportsRelativeSeek)
         val hasProgress = (latestDuration > 0L) || (position > 0L)
+        val sliderEnabled = hasProgress
         val colors = overlayColorScheme
         controlsState.value = ControlsUiState(
             isVisible = overlayState !is OverlayState.None,
@@ -546,8 +546,8 @@ class OverlayService : LifecycleService() {
             position = position,
             duration = latestDuration,
             canSeek = hasProgress,
-            canSeekTo = capabilities.supportsSeekTo,
-            canSeekBy = capabilities.canSeekBy,
+            canSeekTo = hasProgress,
+            canSeekBy = hasProgress,
             canSeekRelativeOnly = capabilities.canSeekRelativeOnly,
             isSliderEnabled = sliderEnabled,
             overlayFillMode = preferences.fillMode,

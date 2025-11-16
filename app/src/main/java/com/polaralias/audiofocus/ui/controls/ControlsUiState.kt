@@ -23,7 +23,12 @@ data class ControlsUiState(
     @ColorInt val contentColor: Int = Color.WHITE,
     val appearanceVersion: Int = 0
 ) {
-    val safeDuration: Long get() = duration.coerceAtLeast(0L)
+    val safeDuration: Long
+        get() = when {
+            duration > 0L -> duration
+            position > 0L -> position
+            else -> 0L
+        }
     val clampedPosition: Long get() = position.coerceIn(0L, safeDuration.takeIf { it > 0L } ?: Long.MAX_VALUE)
     val requiresSeekByFallback: Boolean get() = canSeekRelativeOnly
 }
