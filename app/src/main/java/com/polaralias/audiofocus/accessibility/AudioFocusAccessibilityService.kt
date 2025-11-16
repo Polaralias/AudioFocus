@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import com.polaralias.audiofocus.AudioFocusApp
 import com.polaralias.audiofocus.state.FocusStateRepository
 import com.polaralias.audiofocus.state.WindowSnapshot
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-class AudioFocusAccessibilityService : AccessibilityService() {
+open class AudioFocusAccessibilityService : AccessibilityService() {
     private lateinit var repository: FocusStateRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -72,31 +73,101 @@ class AudioFocusAccessibilityService : AccessibilityService() {
 
     private fun captureActiveWindow(event: AccessibilityEvent): WindowSnapshot? {
         val root = rootInActiveWindow
-        if (root == null) {
+        if (root != null) {
+            val snapshot = try {
+                val packageName = root.packageName?.toString()
+
+                // Strict enforcement: Only YouTube and YouTube Music are supported
+                val app = packageName.toSupportedApp()
+                if (app == null) {
+                    Log.v(TAG, "Ignoring unsupported app: $packageName")
+                    null
+                } else {
+                    val bounds = Rect().also(root::getBoundsInScreen)
+                    val state = when {
+                        isPictureInPicture(event, bounds) -> WindowState.PICTURE_IN_PICTURE
+                        else -> deriveStateFromBounds(bounds)
+                    }
+
+                    Log.d(TAG, "Window captured for $app: state=$state, bounds=$bounds")
+                    WindowSnapshot(app, state)
+                }
+            } finally {
+                root.recycle()
+            }
+
+            if (snapshot != null) {
+                return snapshot
+            }
+        } else {
             Log.d(TAG, "No active window root available")
+        }
+
+        return capturePictureInPictureWindow(event)
+    }
+
+    private fun capturePictureInPictureWindow(event: AccessibilityEvent): WindowSnapshot? {
+        val candidates = collectCandidateWindows(event)
+        if (candidates.isEmpty()) {
             return null
         }
-        return try {
-            val packageName = root.packageName?.toString()
-            
-            // Strict enforcement: Only YouTube and YouTube Music are supported
-            val app = packageName.toSupportedApp()
-            if (app == null) {
-                Log.v(TAG, "Ignoring unsupported app: $packageName")
-                return null
-            }
-            
-            val bounds = Rect().also(root::getBoundsInScreen)
-            val state = when {
-                isPictureInPicture(event, bounds) -> WindowState.PICTURE_IN_PICTURE
-                else -> deriveStateFromBounds(bounds)
-            }
-            
-            Log.d(TAG, "Window captured for $app: state=$state, bounds=$bounds")
-            WindowSnapshot(app, state)
-        } finally {
-            root.recycle()
+
+        val metrics = resources.displayMetrics
+        val screenArea = (metrics.widthPixels * metrics.heightPixels).takeIf { it > 0 }
+        if (screenArea == null) {
+            Log.w(TAG, "Invalid screen dimensions while evaluating PiP windows")
+            return null
         }
+
+        candidates.forEach { windowInfo ->
+            val root = windowInfo.root ?: return@forEach
+            try {
+                val packageName = root.packageName?.toString()
+                val app = packageName.toSupportedApp()
+                if (app == null) {
+                    Log.v(TAG, "Skipping unsupported PiP window: $packageName")
+                    return@forEach
+                }
+
+                val bounds = Rect().also(windowInfo::getBoundsInScreen)
+                val coverage = calculateCoverage(bounds, screenArea)
+                val isPipWindow = windowInfo.type == AccessibilityWindowInfo.TYPE_PICTURE_IN_PICTURE ||
+                    (coverage != null && coverage < PIP_COVERAGE_THRESHOLD)
+                if (isPipWindow) {
+                    Log.d(
+                        TAG,
+                        "PiP window detected for $app via windows list: bounds=$bounds, coverage=$coverage, type=${windowInfo.type}"
+                    )
+                    return WindowSnapshot(app, WindowState.PICTURE_IN_PICTURE)
+                }
+            } finally {
+                root.recycle()
+            }
+        }
+
+        return null
+    }
+
+    private fun calculateCoverage(bounds: Rect, screenArea: Int): Float? {
+        val width = bounds.width().coerceAtLeast(0)
+        val height = bounds.height().coerceAtLeast(0)
+        val windowArea = width * height
+        if (windowArea <= 0 || screenArea <= 0) {
+            return null
+        }
+        return windowArea.toFloat() / screenArea.toFloat()
+    }
+
+    internal open fun serviceWindows(): List<AccessibilityWindowInfo> = windows
+
+    private fun collectCandidateWindows(event: AccessibilityEvent): List<AccessibilityWindowInfo> {
+        val candidateWindows = ArrayList<AccessibilityWindowInfo>()
+        val sourceWindow = event.source?.window
+        if (sourceWindow != null) {
+            candidateWindows.add(sourceWindow)
+        }
+        candidateWindows.addAll(serviceWindows())
+        return candidateWindows
     }
 
     private fun isPictureInPicture(event: AccessibilityEvent, bounds: Rect): Boolean {
