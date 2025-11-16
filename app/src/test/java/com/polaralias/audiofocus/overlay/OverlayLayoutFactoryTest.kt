@@ -1,12 +1,14 @@
 package com.polaralias.audiofocus.overlay
 
 import android.content.Context
+import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.test.core.app.ApplicationProvider
 import com.polaralias.audiofocus.model.OverlayState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -52,5 +54,26 @@ class OverlayLayoutFactoryTest {
         val params = OverlayLayoutFactory.controlsLayout()
         assertNotNull(params)
         assertEquals(WindowManager.LayoutParams.WRAP_CONTENT, params.height)
+    }
+
+    @Test
+    fun maskLayoutUsesOpaquePixelFormat() {
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
+        assertNotNull(params)
+        assertEquals(PixelFormat.OPAQUE, params!!.format)
+    }
+
+    @Test
+    fun maskLayoutIncludesLayoutNoLimitsFlag() {
+        val params = OverlayLayoutFactory.maskLayoutFor(context, OverlayState.Fullscreen)
+        assertNotNull(params)
+        assertTrue(params!!.flags and WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS != 0)
+    }
+
+    @Test
+    fun controlsLayoutWatchesOutsideTouchEvents() {
+        val params = OverlayLayoutFactory.controlsLayout()
+        assertNotNull(params)
+        assertTrue(params!!.flags and WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH != 0)
     }
 }
