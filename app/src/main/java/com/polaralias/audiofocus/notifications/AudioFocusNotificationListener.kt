@@ -12,6 +12,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.polaralias.audiofocus.AudioFocusApp
+import com.polaralias.audiofocus.media.YouTubeMusicMetadata
 import com.polaralias.audiofocus.state.FocusStateRepository
 import com.polaralias.audiofocus.state.PlaybackActivity
 import com.polaralias.audiofocus.state.PlaybackContentType
@@ -192,26 +193,29 @@ class AudioFocusNotificationListener : NotificationListenerService() {
             ?: DEFAULT_YTM_CACHE_KEY
 
         val contentType = contentTypeCache.getOrPut(key) {
-            // Custom YouTube Music metadata keys for video detection
-            // VIDEO_WIDTH and VIDEO_HEIGHT: Dimensions in pixels when video content is present (0 for audio-only)
-            // PRESENTATION_DISPLAY_TYPE: Type indicator where 1 = video, other values = audio-only
-            // These are not in standard MediaMetadata constants but are set by YouTube Music app
-            @Suppress("WrongConstant")
-            val width = metadata.getLong(METADATA_KEY_VIDEO_WIDTH)
-            @Suppress("WrongConstant")
-            val height = metadata.getLong(METADATA_KEY_VIDEO_HEIGHT)
-            @Suppress("WrongConstant")
-            val presentationType = metadata.getLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE)
-
-            val isVideo = (width > 0 && height > 0) || presentationType == PRESENTATION_DISPLAY_TYPE_VIDEO
-            val type = if (isVideo) {
-                Log.d(TAG, "YouTube Music: Video detected (width=$width, height=$height, presentationType=$presentationType)")
-                PlaybackContentType.VIDEO
-            } else {
-                Log.d(TAG, "YouTube Music: Audio-only content (width=$width, height=$height, presentationType=$presentationType)")
-                PlaybackContentType.AUDIO_ONLY
+            val videoMetadata = YouTubeMusicMetadata.extractVideoMetadata(metadata)
+            when {
+                videoMetadata == null -> {
+                    Log.d(TAG, "YouTube Music: No video metadata hints, assuming audio-only")
+                    PlaybackContentType.AUDIO_ONLY
+                }
+                videoMetadata.indicatesVideo -> {
+                    Log.d(
+                        TAG,
+                        "YouTube Music: Video detected (width=${videoMetadata.videoWidth}, " +
+                            "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
+                    )
+                    PlaybackContentType.VIDEO
+                }
+                else -> {
+                    Log.d(
+                        TAG,
+                        "YouTube Music: Audio-only content (width=${videoMetadata.videoWidth}, " +
+                            "height=${videoMetadata.videoHeight}, presentation=${videoMetadata.presentationDisplayType})"
+                    )
+                    PlaybackContentType.AUDIO_ONLY
+                }
             }
-            type
         }
         return contentType
     }
@@ -306,10 +310,6 @@ class AudioFocusNotificationListener : NotificationListenerService() {
     companion object {
         private const val TAG = "AudioFocusNotificationListener"
         private const val CONTENT_TYPE_CACHE_TTL_MS = 30_000L
-        private const val METADATA_KEY_VIDEO_WIDTH = "android.media.metadata.VIDEO_WIDTH"
-        private const val METADATA_KEY_VIDEO_HEIGHT = "android.media.metadata.VIDEO_HEIGHT"
-        private const val METADATA_KEY_PRESENTATION_DISPLAY_TYPE = "android.media.metadata.PRESENTATION_DISPLAY_TYPE"
-        private const val PRESENTATION_DISPLAY_TYPE_VIDEO = 1L
         private const val DEFAULT_YTM_CACHE_KEY = "youtube_music_default"
 
         @Volatile

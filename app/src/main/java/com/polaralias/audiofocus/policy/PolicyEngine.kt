@@ -1,7 +1,9 @@
 package com.polaralias.audiofocus.policy
 
+import android.media.MediaMetadata
 import android.media.session.PlaybackState
 import android.util.Log
+import com.polaralias.audiofocus.media.YouTubeMusicMetadata
 import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.window.AppWindowInfo
 import com.polaralias.audiofocus.window.PlayMode
@@ -28,6 +30,7 @@ object PolicyEngine {
             YOUTUBE_MUSIC -> evaluateYouTubeMusic(
                 enabled = prefs.enableYouTubeMusic,
                 windowInfo = windowInfo,
+                metadata = input.metadata,
             )
             else -> {
                 Log.d(TAG, "Package not supported for overlays: $pkg")
@@ -84,6 +87,7 @@ object PolicyEngine {
     private fun evaluateYouTubeMusic(
         enabled: Boolean,
         windowInfo: AppWindowInfo?,
+        metadata: MediaMetadata?,
     ): OverlayState {
         if (!enabled) {
             Log.d(TAG, "YouTube Music overlay disabled in preferences")
@@ -101,6 +105,15 @@ object PolicyEngine {
             return OverlayState.None
         }
 
+        val videoMetadata = YouTubeMusicMetadata.extractVideoMetadata(metadata)
+        if (videoMetadata?.indicatesVideo == true) {
+            Log.d(
+                TAG,
+                "YouTube Music metadata indicates video (state=$windowState, metadata=$videoMetadata)"
+            )
+            return OverlayState.Fullscreen
+        }
+
         val selectedMode = info.selectedMode
         val videoSurfaceFraction = info.videoSurfaceFraction
         val isVideo = videoSurfaceFraction >= VIDEO_SURFACE_THRESHOLD || selectedMode == PlayMode.VIDEO
@@ -109,14 +122,14 @@ object PolicyEngine {
             Log.d(
                 TAG,
                 "YouTube Music playback classified as audio (mode=${info.playMode}, selection=$selectedMode, " +
-                    "fraction=$videoSurfaceFraction)"
+                    "fraction=$videoSurfaceFraction, metadata=$videoMetadata)"
             )
             return OverlayState.None
         }
 
         Log.d(
             TAG,
-            "YouTube Music video detected (state=$windowState, selection=$selectedMode, " +
+            "YouTube Music video detected via heuristics (state=$windowState, selection=$selectedMode, " +
                 "fraction=$videoSurfaceFraction) - showing fullscreen overlay"
         )
         return OverlayState.Fullscreen
