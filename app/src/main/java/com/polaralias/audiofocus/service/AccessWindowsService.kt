@@ -3,6 +3,7 @@ package com.polaralias.audiofocus.service
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.polaralias.audiofocus.window.WindowCacheTelemetry
 import com.polaralias.audiofocus.window.WindowHeuristics
 import com.polaralias.audiofocus.window.WindowInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,8 @@ class AccessWindowsService : AccessibilityService() {
         private const val TAG = "AccessWindowsService"
         private val _windowInfo = MutableStateFlow(WindowInfo.Empty)
         val windowInfo: StateFlow<WindowInfo> = _windowInfo
+        private val _windowCacheTelemetry = MutableStateFlow(WindowCacheTelemetry())
+        val windowCacheTelemetry: StateFlow<WindowCacheTelemetry> = _windowCacheTelemetry
     }
 
     private val heuristics by lazy { WindowHeuristics(this) }
@@ -41,6 +44,7 @@ class AccessWindowsService : AccessibilityService() {
         try {
             val info = heuristics.evaluate(windows?.toList(), resources.displayMetrics)
             _windowInfo.value = info
+            _windowCacheTelemetry.value = heuristics.cacheTelemetry.value
             Log.d(
                 TAG,
                 "Window info published: focused=${info.focusedPackage}, entries=${info.appWindows}"

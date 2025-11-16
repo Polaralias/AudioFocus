@@ -2,7 +2,9 @@ package com.polaralias.audiofocus.window
 
 import android.content.Context
 import android.graphics.Rect
+import android.os.SystemClock
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
@@ -10,22 +12,38 @@ import org.json.JSONObject
 import java.util.ArrayDeque
 import java.util.Locale
 import kotlin.math.max
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
-class WindowHeuristics(context: Context) {
+class WindowHeuristics(
+    context: Context,
+    private val nowProvider: () -> Long = { SystemClock.elapsedRealtime() },
+) {
     private val heuristics: VideoHeuristics = loadHeuristics(context)
     private val surfaceHints: List<SurfaceHint> =
         (heuristics.surfaceHints + EXTRA_SURFACE_HINTS).ifEmpty { FALLBACK_HINTS + EXTRA_SURFACE_HINTS }
     private val lastKnownPackageByWindowId = mutableMapOf<Int, String>()
     private var lastKnownFocusedPackage: String? = null
+    private var lastVisibleSnapshot: WindowInfo = WindowInfo.Empty
+    private var lastVisibleSnapshotTimestamp: Long = 0L
+
+    private val _cacheTelemetry = MutableStateFlow(WindowCacheTelemetry())
+    val cacheTelemetry: StateFlow<WindowCacheTelemetry> = _cacheTelemetry
 
     fun evaluate(windows: List<AccessibilityWindowInfo>?, metrics: DisplayMetrics): WindowInfo {
-        if (windows.isNullOrEmpty()) return WindowInfo.Empty
+        val windowList = windows.orEmpty()
+        val observedWindowIds = mutableSetOf<Int>()
+        if (windowList.isEmpty()) {
+            lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
+            return resolveEmptyResult(CacheReason.NO_WINDOWS)
+        }
 
         val bestByPackage = mutableMapOf<String, WindowCandidate>()
         var focusedPackage: String? = null
-        val observedWindowIds = mutableSetOf<Int>()
+        var sawTransientSystemWindow = false
+        var sawNonTransientWindow = false
 
-        windows.forEach { window ->
+        windowList.forEach { window ->
             val windowId = window.id
             observedWindowIds += windowId
 
@@ -34,6 +52,13 @@ class WindowHeuristics(context: Context) {
             val state = determineWindowState(window, coverage)
 
             val root = window.root
+            val packageName = root?.packageName?.toString()
+            val isTransientSystemWindow = isTransientSystemWindow(window, packageName)
+            if (isTransientSystemWindow) {
+                sawTransientSystemWindow = true
+            } else {
+                sawNonTransientWindow = true
+            }
             if (root == null) {
                 if (state == WindowState.PICTURE_IN_PICTURE) {
                     val fallbackPackage = lastKnownPackageByWindowId[windowId]
@@ -62,7 +87,6 @@ class WindowHeuristics(context: Context) {
                 return@forEach
             }
             try {
-                val packageName = root.packageName?.toString()
                 if (packageName.isNullOrEmpty()) {
                     return@forEach
                 }
@@ -103,19 +127,47 @@ class WindowHeuristics(context: Context) {
 
         val supportedFocusedPackage = focusedPackage?.takeIf { it in SUPPORTED_PACKAGES }
 
-        if (bestByPackage.isEmpty()) {
-            lastKnownFocusedPackage = supportedFocusedPackage ?: lastKnownFocusedPackage
-            lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
-            return WindowInfo.Empty
-        }
-
         lastKnownFocusedPackage = supportedFocusedPackage ?: lastKnownFocusedPackage
         lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
 
-        return WindowInfo(
+        if (bestByPackage.isEmpty()) {
+            val reason = if (sawTransientSystemWindow && !sawNonTransientWindow) {
+                CacheReason.TRANSIENT_SYSTEM
+            } else {
+                CacheReason.NO_SUPPORTED_WINDOWS
+            }
+            return resolveEmptyResult(reason)
+        }
+
+        val info = WindowInfo(
             focusedPackage = supportedFocusedPackage,
             appWindows = bestByPackage.mapValues { it.value.info },
         )
+
+        val hasVisibleEntry = info.appWindows.values.any { it.state != WindowState.BACKGROUND }
+        if (hasVisibleEntry) {
+            storeSnapshot(info)
+            return info
+        }
+
+        clearSnapshot(CacheReason.BACKGROUND)
+        return WindowInfo.Empty
+    }
+
+    private fun resolveEmptyResult(reason: CacheReason): WindowInfo {
+        val shouldUseCache = reason == CacheReason.NO_WINDOWS || reason == CacheReason.TRANSIENT_SYSTEM
+        if (shouldUseCache) {
+            val cached = cachedSnapshotOrNull()
+            if (cached != null) {
+                Log.d(TAG, "Returning cached window snapshot due to $reason")
+                recordTelemetry(CacheAction.RETURNED, reason)
+                return cached
+            }
+            recordTelemetry(CacheAction.MISS, reason)
+        } else if (reason == CacheReason.NO_SUPPORTED_WINDOWS) {
+            clearSnapshot(reason)
+        }
+        return WindowInfo.Empty
     }
 
     private fun determineWindowState(
@@ -336,7 +388,86 @@ class WindowHeuristics(context: Context) {
         }
     }
 
+    private fun cachedSnapshotOrNull(): WindowInfo? {
+        if (lastVisibleSnapshot == WindowInfo.Empty) return null
+        val age = nowProvider() - lastVisibleSnapshotTimestamp
+        if (age > CACHE_TIMEOUT_MS) {
+            Log.v(TAG, "Cached window snapshot expired after ${age}ms")
+            clearSnapshot(CacheReason.EXPIRED)
+            return null
+        }
+        return lastVisibleSnapshot
+    }
+
+    private fun storeSnapshot(info: WindowInfo) {
+        lastVisibleSnapshot = info
+        lastVisibleSnapshotTimestamp = nowProvider()
+        Log.v(
+            TAG,
+            "Cached window snapshot for packages=${info.appWindows.keys} focus=${info.focusedPackage}"
+        )
+        recordTelemetry(CacheAction.STORED, CacheReason.VISIBLE_SNAPSHOT)
+    }
+
+    private fun clearSnapshot(reason: CacheReason) {
+        if (lastVisibleSnapshot == WindowInfo.Empty) return
+        lastVisibleSnapshot = WindowInfo.Empty
+        lastVisibleSnapshotTimestamp = 0L
+        Log.v(TAG, "Cleared cached window snapshot due to $reason")
+        recordTelemetry(CacheAction.CLEARED, reason)
+    }
+
+    private fun recordTelemetry(action: CacheAction, reason: CacheReason) {
+        val previous = _cacheTelemetry.value
+        val updated = when (action) {
+            CacheAction.STORED -> previous.copy(
+                totalStores = previous.totalStores + 1,
+                lastAction = action,
+                lastReason = reason,
+                timestamp = nowProvider(),
+            )
+            CacheAction.RETURNED -> previous.copy(
+                totalHits = previous.totalHits + 1,
+                lastAction = action,
+                lastReason = reason,
+                timestamp = nowProvider(),
+            )
+            CacheAction.CLEARED -> previous.copy(
+                totalClears = previous.totalClears + 1,
+                lastAction = action,
+                lastReason = reason,
+                timestamp = nowProvider(),
+            )
+            CacheAction.MISS -> previous.copy(
+                totalMisses = previous.totalMisses + 1,
+                lastAction = action,
+                lastReason = reason,
+                timestamp = nowProvider(),
+            )
+            CacheAction.NONE -> previous
+        }
+        _cacheTelemetry.value = updated
+    }
+
+    private fun isTransientSystemWindow(
+        window: AccessibilityWindowInfo,
+        packageName: String?,
+    ): Boolean {
+        if (packageName in TRANSIENT_SYSTEM_PACKAGES) return true
+        if (window.type == AccessibilityWindowInfo.TYPE_SYSTEM ||
+            window.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+        ) {
+            return true
+        }
+        val title = window.title?.toString()?.lowercase(Locale.US).orEmpty()
+        if (title.isNotEmpty() && TRANSIENT_TITLE_KEYWORDS.any { title.contains(it) }) {
+            return true
+        }
+        return false
+    }
+
     companion object {
+        private const val TAG = "WindowHeuristics"
         private const val YOUTUBE = "com.google.android.youtube"
         private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
         private val SUPPORTED_PACKAGES = setOf(YOUTUBE, YOUTUBE_MUSIC)
@@ -344,6 +475,7 @@ class WindowHeuristics(context: Context) {
         private const val FULLSCREEN_COVERAGE_THRESHOLD = 0.75f
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
         private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
+        private const val CACHE_TIMEOUT_MS = 750L
 
         private const val MAX_SELECTION_PARENT_DEPTH = 5
 
@@ -377,6 +509,9 @@ class WindowHeuristics(context: Context) {
 
         private val YTM_VIDEO_KEYWORDS = listOf("video", "videos")
         private val YTM_AUDIO_KEYWORDS = listOf("song", "songs", "audio")
+
+        private val TRANSIENT_SYSTEM_PACKAGES = setOf("com.android.systemui")
+        private val TRANSIENT_TITLE_KEYWORDS = listOf("notification", "volume", "controls", "screenshot")
     }
 }
 
