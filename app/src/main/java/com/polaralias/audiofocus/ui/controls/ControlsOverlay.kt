@@ -146,7 +146,8 @@ fun ControlsOverlay(
                     if (!sliderEnabled) return@Slider
                     val target = newValue.roundToInt().toLong()
                     var handled = false
-                    if (state.canSeekTo) {
+                    val shouldPreferRelativeSeek = state.canSeekRelativeOnly
+                    if (!shouldPreferRelativeSeek && state.canSeekTo) {
                         handled = try {
                             onSeekTo(target)
                             true

@@ -77,7 +77,7 @@ class ControlsOverlayTest {
                         position = 2_000L,
                         duration = 12_000L,
                         canSeek = true,
-                        canSeekTo = false,
+                        canSeekTo = true,
                         canSeekBy = true,
                         canSeekRelativeOnly = true,
                         isSliderEnabled = true
@@ -105,7 +105,7 @@ class ControlsOverlayTest {
                 position = 2_000L,
                 duration = 12_000L,
                 canSeek = true,
-                canSeekTo = false,
+                canSeekTo = true,
                 canSeekBy = true,
                 canSeekRelativeOnly = true,
                 isSliderEnabled = true
@@ -160,8 +160,8 @@ class ControlsOverlayTest {
                         duration = 0L,
                         canSeek = false,
                         canSeekTo = false,
-                        canSeekBy = true,
-                        canSeekRelativeOnly = true,
+                        canSeekBy = false,
+                        canSeekRelativeOnly = false,
                         isSliderEnabled = false
                     ),
                     onTogglePlayPause = { events.add("toggle") },
@@ -184,7 +184,8 @@ class ControlsOverlayTest {
     }
 
     @Test
-    fun sliderDisabledWhenSeekCapabilitiesMissing() {
+    fun sliderEnabledWhenSeekCapabilitiesMissing() {
+        var seekToRequested = false
         composeRule.setContent {
             AudioFocusTheme {
                 ControlsOverlay(
@@ -194,17 +195,22 @@ class ControlsOverlayTest {
                         position = 2_000L,
                         duration = 12_000L,
                         canSeek = true,
-                        canSeekTo = false,
-                        canSeekBy = false,
-                        isSliderEnabled = false
+                        canSeekTo = true,
+                        canSeekBy = true,
+                        canSeekRelativeOnly = false,
+                        isSliderEnabled = true
                     ),
                     onTogglePlayPause = { },
-                    onSeekBy = { error("seekBy should not be invoked when capability missing") },
-                    onSeekTo = { error("seekTo should not be invoked when capability missing") }
+                    onSeekBy = { },
+                    onSeekTo = { seekToRequested = true }
                 )
             }
         }
 
-        composeRule.onNodeWithRole(Role.Slider).assertIsNotEnabled()
+        composeRule.onNodeWithRole(Role.Slider)
+            .assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.SetProgress) { action -> action(4_000f) }
+
+        assertTrue(seekToRequested)
     }
 }
