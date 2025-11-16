@@ -7,7 +7,12 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.polaralias.audiofocus.model.MediaState
+import com.polaralias.audiofocus.service.AccessWindowsService
+import com.polaralias.audiofocus.state.SupportedApp
+import com.polaralias.audiofocus.state.toSupportedApp
+import com.polaralias.audiofocus.window.WindowState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,9 +55,47 @@ class MediaSessionMonitor(
     }
 
     private fun updateControllers(controllers: List<MediaController>?) {
-        val controller = controllers.orEmpty()
-            .firstOrNull { it.packageName == YOUTUBE || it.packageName == YOUTUBE_MUSIC }
-        bind(controller)
+        val windowInfo = AccessWindowsService.windowInfo.value
+        val candidates = controllers.orEmpty()
+            .mapIndexedNotNull { index, controller ->
+                val supportedApp = controller.packageName.toSupportedApp() ?: return@mapIndexedNotNull null
+                val playbackState = controller.playbackState
+                val isPlaying = playbackState?.isActivePlayback() == true
+                val appWindowInfo = windowInfo.infoFor(controller.packageName)
+                val isForeground = windowInfo.focusedPackage == controller.packageName
+                val isPipMatch = appWindowInfo?.state == WindowState.PICTURE_IN_PICTURE
+                SessionCandidate(
+                    controller = controller,
+                    app = supportedApp,
+                    playbackState = playbackState,
+                    isPlaying = isPlaying,
+                    isForeground = isForeground,
+                    isPipMatch = isPipMatch,
+                    index = index,
+                )
+            }
+
+        if (candidates.isEmpty()) {
+            Log.d(TAG, "No supported media controllers found, publishing idle state")
+            bind(null)
+            return
+        }
+
+        Log.d(TAG, "Controller candidates: ${candidates.joinToString { it.describe() }}")
+
+        val selected = candidates
+            .sortedWith(candidateComparator)
+            .firstOrNull()
+
+        if (selected == null) {
+            Log.d(TAG, "No controller selected after prioritization")
+            bind(null)
+            return
+        }
+
+        val reason = selected.selectionReason()
+        Log.i(TAG, "Selecting controller ${selected.controller.packageName}: $reason")
+        bind(selected.controller)
     }
 
     private fun bind(target: MediaController?) {
@@ -82,8 +125,38 @@ class MediaSessionMonitor(
     }
 
     companion object {
-        const val YOUTUBE = "com.google.android.youtube"
-        const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
+        private const val TAG = "MediaSessionMonitor"
+        private val candidateComparator = compareByDescending<SessionCandidate> {
+            it.isPlaying && (it.isForeground || it.isPipMatch)
+        }
+            .thenByDescending { it.isForeground }
+            .thenByDescending { it.isPlaying }
+            .thenByDescending { it.isPipMatch }
+            .thenBy { it.index }
+    }
+}
+
+private data class SessionCandidate(
+    val controller: MediaController,
+    val app: SupportedApp,
+    val playbackState: PlaybackState?,
+    val isPlaying: Boolean,
+    val isForeground: Boolean,
+    val isPipMatch: Boolean,
+    val index: Int,
+) {
+    fun describe(): String {
+        return "${controller.packageName}(app=$app, playing=$isPlaying, foreground=$isForeground, pip=$isPipMatch)"
+    }
+
+    fun selectionReason(): String {
+        return when {
+            isPlaying && (isForeground || isPipMatch) ->
+                "playing session with ${if (isForeground) "foreground" else "PiP"} priority"
+            isForeground -> "foreground package priority"
+            isPlaying -> "playing fallback"
+            else -> "default fallback"
+        }
     }
 }
 
