@@ -27,13 +27,17 @@ data class WindowInfo(
 data class AppWindowInfo(
     val packageName: String,
     val state: WindowState,
-    val hasVisibleVideoSurface: Boolean,
+    val videoSurfaceFraction: Float,
+    val playMode: PlayMode,
 ) {
     val isVisible: Boolean
         get() = state != WindowState.BACKGROUND
 
     val isFullscreen: Boolean
         get() = state == WindowState.FULLSCREEN
+
+    val hasVisibleVideoSurface: Boolean
+        get() = videoSurfaceFraction > 0f
 }
 
 enum class WindowState {
@@ -41,4 +45,11 @@ enum class WindowState {
     MINIMIZED_IN_APP,
     PICTURE_IN_PICTURE,
     BACKGROUND,
+}
+
+enum class PlayMode {
+    AUDIO,
+    VIDEO,
+    SHORTS,
+    UNKNOWN,
 }

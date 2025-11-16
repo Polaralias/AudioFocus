@@ -7,9 +7,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.ArrayDeque
+import java.util.Locale
+import kotlin.math.max
 
 class WindowHeuristics(context: Context) {
     private val heuristics: VideoHeuristics = loadHeuristics(context)
+    private val surfaceHints: List<SurfaceHint> =
+        (heuristics.surfaceHints + EXTRA_SURFACE_HINTS).ifEmpty { FALLBACK_HINTS + EXTRA_SURFACE_HINTS }
     private val lastKnownPackageByWindowId = mutableMapOf<Int, String>()
     private var lastKnownFocusedPackage: String? = null
 
@@ -42,7 +47,8 @@ class WindowHeuristics(context: Context) {
                             info = AppWindowInfo(
                                 packageName = fallbackPackage,
                                 state = WindowState.PICTURE_IN_PICTURE,
-                                hasVisibleVideoSurface = true,
+                                videoSurfaceFraction = coverage.coerceIn(0f, 1f),
+                                playMode = PlayMode.VIDEO,
                             ),
                             coverage = coverage,
                         )
@@ -70,34 +76,16 @@ class WindowHeuristics(context: Context) {
                     return@forEach
                 }
 
-                val likelyVideoSurface by lazy { hasLikelyVideoSurface(root) }
-                val assumeVideoSurface = when (state) {
-                    WindowState.MINIMIZED_IN_APP,
-                    WindowState.PICTURE_IN_PICTURE -> true
-                    else -> false
-                }
-
-                val hasVideoSurface = when (packageName) {
-                    YOUTUBE -> when (state) {
-                        WindowState.BACKGROUND -> false
-                        WindowState.FULLSCREEN -> likelyVideoSurface
-                        WindowState.MINIMIZED_IN_APP,
-                        WindowState.PICTURE_IN_PICTURE -> true
-                    }
-                    YOUTUBE_MUSIC -> when (state) {
-                        WindowState.BACKGROUND -> false
-                        WindowState.FULLSCREEN -> true
-                        WindowState.MINIMIZED_IN_APP,
-                        WindowState.PICTURE_IN_PICTURE -> assumeVideoSurface || likelyVideoSurface
-                    }
-                    else -> false
-                }
+                val analysis = analyzeWindow(packageName, root, metrics)
+                val videoSurfaceFraction = if (state == WindowState.BACKGROUND) 0f else analysis.videoSurfaceFraction
+                val playMode = if (state == WindowState.BACKGROUND) PlayMode.AUDIO else analysis.playMode
 
                 val candidate = WindowCandidate(
                     info = AppWindowInfo(
                         packageName = packageName,
                         state = state,
-                        hasVisibleVideoSurface = hasVideoSurface,
+                        videoSurfaceFraction = videoSurfaceFraction,
+                        playMode = playMode,
                     ),
                     coverage = coverage,
                 )
@@ -158,47 +146,168 @@ class WindowHeuristics(context: Context) {
         return if (windowArea == 0) 0f else windowArea.toFloat() / screenArea.toFloat()
     }
 
-    private fun hasLikelyVideoSurface(root: AccessibilityNodeInfo): Boolean {
-        if (findVideoSurface(root)) return true
-        // Fullscreen windows occasionally fail the heuristics due to obfuscated class names.
+    private fun analyzeWindow(
+        packageName: String,
+        root: AccessibilityNodeInfo,
+        metrics: DisplayMetrics,
+    ): WindowAnalysis {
+        val screenArea = (metrics.widthPixels * metrics.heightPixels).coerceAtLeast(1).toFloat()
+        var maxSurfaceFraction = 0f
+        var shortsDetected = false
+        var youtubeMusicSelection: PlayMode? = null
+
+        traverseNodes(root) { node ->
+            val label = buildLabel(node)
+            val viewId = node.viewIdResourceName?.lowercase(Locale.US).orEmpty()
+            val className = node.className?.toString()?.lowercase(Locale.US).orEmpty()
+
+            val matchedHint = matchSurfaceHint(className, viewId, label)
+            if (matchedHint != null && (node.isVisibleToUser || matchedHint.allowHidden)) {
+                val bounds = Rect()
+                node.getBoundsInScreen(bounds)
+                val width = bounds.width().coerceAtLeast(0)
+                val height = bounds.height().coerceAtLeast(0)
+                val area = width * height
+                if (area > 0) {
+                    val fraction = (area.toFloat() / screenArea).coerceIn(0f, 1f)
+                    maxSurfaceFraction = max(maxSurfaceFraction, fraction)
+                }
+            }
+
+            if (packageName == YOUTUBE && !shortsDetected) {
+                shortsDetected = indicatesShorts(label, viewId, className)
+            }
+
+            if (packageName == YOUTUBE_MUSIC && youtubeMusicSelection == null) {
+                youtubeMusicSelection = detectYouTubeMusicSelection(node, label)
+            }
+        }
+
+        val playMode = when (packageName) {
+            YOUTUBE -> when {
+                maxSurfaceFraction > 0f && shortsDetected -> PlayMode.SHORTS
+                maxSurfaceFraction > 0f -> PlayMode.VIDEO
+                else -> PlayMode.AUDIO
+            }
+            YOUTUBE_MUSIC -> when {
+                maxSurfaceFraction > 0f -> PlayMode.VIDEO
+                youtubeMusicSelection != null -> youtubeMusicSelection!!
+                else -> PlayMode.AUDIO
+            }
+            else -> if (maxSurfaceFraction > 0f) PlayMode.VIDEO else PlayMode.AUDIO
+        }
+
+        return WindowAnalysis(
+            videoSurfaceFraction = maxSurfaceFraction,
+            playMode = playMode,
+        )
+    }
+
+    private fun matchSurfaceHint(
+        className: String,
+        viewId: String,
+        label: String,
+    ): SurfaceHint? {
+        if (surfaceHints.isEmpty()) return null
+        return surfaceHints.firstOrNull { it.matches(className, viewId, label) }
+    }
+
+    private fun traverseNodes(root: AccessibilityNodeInfo, visitor: (AccessibilityNodeInfo) -> Unit) {
+        val stack = ArrayDeque<AccessibilityNodeInfo>()
+        stack.addLast(AccessibilityNodeInfo.obtain(root))
+        while (stack.isNotEmpty()) {
+            val node = stack.removeLast()
+            try {
+                visitor(node)
+                for (i in 0 until node.childCount) {
+                    node.getChild(i)?.let { stack.addLast(it) }
+                }
+            } finally {
+                node.recycle()
+            }
+        }
+    }
+
+    private fun indicatesShorts(
+        label: String,
+        viewId: String,
+        className: String,
+    ): Boolean {
+        if (SHORTS_KEYWORDS.any { label.contains(it) || viewId.contains(it) }) {
+            return true
+        }
+        if (SHORTS_CLASS_HINTS.any { className.contains(it) }) {
+            return true
+        }
+        if (SHORTS_CONTAINER_CLASSES.any { className.contains(it) } &&
+            SHORTS_KEYWORDS.any { viewId.contains(it) || label.contains(it) }
+        ) {
+            return true
+        }
         return false
     }
 
-    private fun findVideoSurface(node: AccessibilityNodeInfo): Boolean {
-        val className = node.className?.toString().orEmpty()
-        if (heuristics.surfaceClasses.any { className.contains(it, ignoreCase = false) }) {
-            return true
-        }
-        val text = listOfNotNull(node.text?.toString(), node.contentDescription?.toString())
-            .joinToString(separator = " ").lowercase()
-        if (heuristics.keywords.any { text.contains(it) }) {
-            return true
-        }
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            try {
-                if (findVideoSurface(child)) return true
-            } finally {
-                child.recycle()
+    private fun detectYouTubeMusicSelection(
+        node: AccessibilityNodeInfo,
+        label: String,
+    ): PlayMode? {
+        if (label.isEmpty()) return null
+        val inferred = when {
+            YTM_VIDEO_KEYWORDS.any { label.contains(it) } -> PlayMode.VIDEO
+            YTM_AUDIO_KEYWORDS.any { label.contains(it) } -> PlayMode.AUDIO
+            else -> null
+        } ?: return null
+        return if (isNodeOrAncestorSelected(node)) inferred else null
+    }
+
+    private fun isNodeOrAncestorSelected(node: AccessibilityNodeInfo): Boolean {
+        var depth = 0
+        var current: AccessibilityNodeInfo? = AccessibilityNodeInfo.obtain(node)
+        while (current != null && depth < MAX_SELECTION_PARENT_DEPTH) {
+            val selected = current.isSelected ||
+                current.isChecked ||
+                current.isAccessibilityFocused ||
+                current.stateDescription?.contains("selected", ignoreCase = true) == true ||
+                current.contentDescription?.toString()?.contains("selected", ignoreCase = true) == true
+            if (selected) {
+                current.recycle()
+                return true
             }
+            val parent = current.parent
+            current.recycle()
+            current = parent
+            depth++
         }
+        current?.recycle()
         return false
+    }
+
+    private fun buildLabel(node: AccessibilityNodeInfo): String {
+        val pieces = mutableListOf<String>()
+        node.text?.toString()?.takeIf { it.isNotBlank() }?.let { pieces += it }
+        node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { pieces += it }
+        if (pieces.isEmpty()) return ""
+        return pieces.joinToString(separator = " ").lowercase(Locale.US)
     }
 
     private fun loadHeuristics(context: Context): VideoHeuristics {
         return runCatching {
             context.assets.open("video_heuristics.json").bufferedReader().use { reader ->
                 val json = JSONObject(reader.readText())
+                val classHints = json.getJSONArray("surface_classes")
+                    .toStringList()
+                    .mapNotNull { it.takeIf(String::isNotEmpty)?.lowercase(Locale.US) }
+                    .map { SurfaceHint(classSubstrings = listOf(it)) }
+                val keywordHints = json.getJSONArray("keywords")
+                    .toStringList()
+                    .mapNotNull { it.takeIf(String::isNotEmpty)?.lowercase(Locale.US) }
+                    .map { SurfaceHint(labelSubstrings = listOf(it)) }
                 VideoHeuristics(
-                    surfaceClasses = json.getJSONArray("surface_classes").toStringList(),
-                    keywords = json.getJSONArray("keywords").toStringList()
+                    surfaceHints = classHints + keywordHints,
                 )
             }
         }.getOrElse {
-            VideoHeuristics(
-                surfaceClasses = listOf("SurfaceView", "TextureView", "PlayerView"),
-                keywords = listOf("video", "player")
-            )
+            VideoHeuristics(surfaceHints = FALLBACK_HINTS)
         }
     }
 
@@ -225,11 +334,6 @@ class WindowHeuristics(context: Context) {
         }
     }
 
-    data class VideoHeuristics(
-        val surfaceClasses: List<String>,
-        val keywords: List<String>
-    )
-
     companion object {
         private const val YOUTUBE = "com.google.android.youtube"
         private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
@@ -239,11 +343,64 @@ class WindowHeuristics(context: Context) {
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
         private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
 
+        private const val MAX_SELECTION_PARENT_DEPTH = 5
+
         private val STATE_PRIORITY = mapOf(
             WindowState.FULLSCREEN to 3,
             WindowState.MINIMIZED_IN_APP to 2,
             WindowState.PICTURE_IN_PICTURE to 2,
             WindowState.BACKGROUND to 0,
         )
+
+        private val FALLBACK_HINTS = listOf(
+            SurfaceHint(classSubstrings = listOf("surfaceview")),
+            SurfaceHint(classSubstrings = listOf("textureview")),
+            SurfaceHint(classSubstrings = listOf("playerview")),
+            SurfaceHint(labelSubstrings = listOf("video")),
+            SurfaceHint(labelSubstrings = listOf("player")),
+        )
+
+        private val EXTRA_SURFACE_HINTS = listOf(
+            SurfaceHint(viewIdSubstrings = listOf("player_view"), allowHidden = true),
+            SurfaceHint(viewIdSubstrings = listOf("video_surface")),
+            SurfaceHint(viewIdSubstrings = listOf("watch_player"), allowHidden = true),
+            SurfaceHint(viewIdSubstrings = listOf("shorts_player"), allowHidden = true),
+            SurfaceHint(viewIdSubstrings = listOf("miniplayer"), allowHidden = true),
+            SurfaceHint(viewIdSubstrings = listOf("pip"), allowHidden = true),
+        )
+
+        private val SHORTS_KEYWORDS = listOf("shorts", "reel", "reels", "shortform", "clip")
+        private val SHORTS_CLASS_HINTS = listOf("shorts", "shortvideo")
+        private val SHORTS_CONTAINER_CLASSES = listOf("viewpager", "recyclerview")
+
+        private val YTM_VIDEO_KEYWORDS = listOf("video", "videos")
+        private val YTM_AUDIO_KEYWORDS = listOf("song", "songs", "audio")
+    }
+}
+
+private data class WindowAnalysis(
+    val videoSurfaceFraction: Float,
+    val playMode: PlayMode,
+)
+
+data class VideoHeuristics(
+    val surfaceHints: List<SurfaceHint>,
+)
+
+data class SurfaceHint(
+    val classSubstrings: List<String> = emptyList(),
+    val viewIdSubstrings: List<String> = emptyList(),
+    val labelSubstrings: List<String> = emptyList(),
+    val allowHidden: Boolean = false,
+) {
+    fun matches(
+        className: String,
+        viewId: String,
+        label: String,
+    ): Boolean {
+        if (classSubstrings.any { className.contains(it) }) return true
+        if (viewIdSubstrings.any { viewId.contains(it) }) return true
+        if (labelSubstrings.any { label.contains(it) }) return true
+        return false
     }
 }

@@ -69,6 +69,7 @@ class WindowHeuristicsTest {
         entry!!
         assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
         assertTrue(entry.hasVisibleVideoSurface)
+        assertEquals(PlayMode.VIDEO, entry.playMode)
     }
 
     @Test
@@ -129,6 +130,7 @@ class WindowHeuristicsTest {
         entry!!
         assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
         assertTrue(entry.hasVisibleVideoSurface)
+        assertEquals(PlayMode.VIDEO, entry.playMode)
         assertEquals(null, result.focusedPackage)
     }
 }
