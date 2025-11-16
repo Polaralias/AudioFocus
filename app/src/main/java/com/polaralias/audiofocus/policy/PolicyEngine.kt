@@ -4,6 +4,7 @@ import android.media.session.PlaybackState
 import android.util.Log
 import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.window.AppWindowInfo
+import com.polaralias.audiofocus.window.PlayMode
 import com.polaralias.audiofocus.window.WindowState
 
 object PolicyEngine {
@@ -56,9 +57,14 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        val hasVideoSignal = info.hasVisibleVideoSurface || state in RELAXED_VIDEO_STATES
-        if (!hasVideoSignal && state == WindowState.FULLSCREEN) {
-            Log.d(TAG, "YouTube fullscreen without video signal, hiding overlay")
+        val heuristicsVideo = info.playMode == PlayMode.VIDEO || info.playMode == PlayMode.SHORTS
+        val pipOverride = state == WindowState.PICTURE_IN_PICTURE && info.videoSurfaceFraction > 0f
+
+        if (!heuristicsVideo && !pipOverride) {
+            Log.d(
+                TAG,
+                "YouTube state=$state playMode=${info.playMode} surfaceFraction=${info.videoSurfaceFraction} -> hiding overlay"
+            )
             return OverlayState.None
         }
 
@@ -66,11 +72,10 @@ object PolicyEngine {
             WindowState.FULLSCREEN,
             WindowState.MINIMIZED_IN_APP,
             WindowState.PICTURE_IN_PICTURE -> {
-                if (!hasVideoSignal) {
-                    Log.d(TAG, "YouTube state=$state lacks video signal, hiding overlay")
-                    return OverlayState.None
-                }
-                Log.d(TAG, "YouTube visible (state=$state), showing fullscreen overlay")
+                Log.d(
+                    TAG,
+                    "YouTube visible (state=$state, playMode=${info.playMode}), showing fullscreen overlay"
+                )
                 OverlayState.Fullscreen
             }
             WindowState.BACKGROUND -> OverlayState.None
@@ -98,30 +103,24 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        val hasVideoSurface = info.hasVisibleVideoSurface
-        val relaxedSignal = windowState in RELAXED_VIDEO_STATES
+        val heuristicsVideo = when (info.playMode) {
+            PlayMode.VIDEO, PlayMode.SHORTS -> true
+            PlayMode.UNKNOWN -> info.videoSurfaceFraction > 0f || windowState == WindowState.PICTURE_IN_PICTURE
+            PlayMode.AUDIO -> false
+        }
         val classification = classifyYouTubeMusicVideo(metadata)
-        val heuristicVideoSignal = hasVideoSurface || relaxedSignal || windowState == WindowState.FULLSCREEN
+        val pipOverride = windowState == WindowState.PICTURE_IN_PICTURE && info.videoSurfaceFraction > 0f
         val isVideo = when (classification.category) {
-            VideoClassification.VIDEO ->
-                hasVideoSurface || windowState == WindowState.PICTURE_IN_PICTURE
-            VideoClassification.AUDIO -> {
-                if (!classification.metadataTrusted && heuristicVideoSignal) {
-                    Log.d(
-                        TAG,
-                        "YouTube Music metadata reported audio but heuristics detected video cues (state=$windowState, " +
-                            "hasSurface=$hasVideoSurface)"
-                    )
-                    heuristicVideoSignal
-                } else {
-                    false
-                }
-            }
-            VideoClassification.UNKNOWN -> heuristicVideoSignal
+            VideoClassification.VIDEO -> true
+            VideoClassification.AUDIO -> heuristicsVideo && !classification.metadataTrusted
+            VideoClassification.UNKNOWN -> heuristicsVideo
         }
 
-        if (!isVideo) {
-            Log.d(TAG, "YouTube Music playback classified as non-video")
+        if (!isVideo && !pipOverride) {
+            Log.d(
+                TAG,
+                "YouTube Music playback classified as non-video (mode=${info.playMode}, fraction=${info.videoSurfaceFraction})"
+            )
             return OverlayState.None
         }
 
@@ -217,10 +216,6 @@ object PolicyEngine {
     private const val TAG = "PolicyEngine"
     private const val YOUTUBE = "com.google.android.youtube"
     private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
-    private val RELAXED_VIDEO_STATES = setOf(
-        WindowState.MINIMIZED_IN_APP,
-        WindowState.PICTURE_IN_PICTURE,
-    )
     private const val METADATA_KEY_VIDEO_WIDTH = "android.media.metadata.VIDEO_WIDTH"
     private const val METADATA_KEY_VIDEO_HEIGHT = "android.media.metadata.VIDEO_HEIGHT"
     private const val METADATA_KEY_PRESENTATION_DISPLAY_TYPE = "android.media.metadata.PRESENTATION_DISPLAY_TYPE"
