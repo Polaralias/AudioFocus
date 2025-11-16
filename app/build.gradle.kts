@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "com.polaralias.audiofocus"
-        minSdk = 31
-        targetSdk = 35
+        minSdk = 26
+        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
