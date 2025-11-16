@@ -3,7 +3,7 @@ package com.polaralias.audiofocus.overlay
 enum class App { YOUTUBE, YTMUSIC, OTHER }
 enum class WindowState { FULLSCREEN, MINIMIZED_IN_APP, PIP, BACKGROUND, NON_FULLSCREEN_VIDEO }
 enum class Playback { PLAYING_VIDEO_VISIBLE, PLAYING_BACKGROUND, PAUSED, STOPPED }
-enum class OverlayBehaviour { FULL_SCREEN_OVERLAY, PARTIAL_80_PASS_THROUGH, NONE }
+enum class OverlayBehaviour { FULL_SCREEN_OVERLAY, NONE }
 
 data class ContextState(
     val app: App,
@@ -36,10 +36,10 @@ object OverlayPolicy {
             Playback.PAUSED, Playback.STOPPED -> OverlayBehaviour.NONE
             Playback.PLAYING_BACKGROUND -> OverlayBehaviour.NONE
             Playback.PLAYING_VIDEO_VISIBLE -> when (state.windowState) {
-                WindowState.FULLSCREEN -> OverlayBehaviour.FULL_SCREEN_OVERLAY
+                WindowState.FULLSCREEN,
                 WindowState.MINIMIZED_IN_APP,
                 WindowState.NON_FULLSCREEN_VIDEO,
-                WindowState.PIP -> OverlayBehaviour.PARTIAL_80_PASS_THROUGH
+                WindowState.PIP -> OverlayBehaviour.FULL_SCREEN_OVERLAY
                 else -> OverlayBehaviour.NONE
             }
         }

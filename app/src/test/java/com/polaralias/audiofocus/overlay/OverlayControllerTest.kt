@@ -3,9 +3,7 @@ package com.polaralias.audiofocus.overlay
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoMoreInteractions
@@ -32,20 +30,6 @@ class OverlayControllerTest {
         controller.update(state)
 
         verify(mockApplier).showFullScreenOverlay()
-        verifyNoMoreInteractions(mockApplier)
-    }
-
-    @Test
-    fun `update shows partial overlay when policy decides partial`() {
-        val state = ContextState(
-            app = App.YTMUSIC,
-            windowState = WindowState.MINIMIZED_IN_APP,
-            playback = Playback.PLAYING_VIDEO_VISIBLE
-        )
-
-        controller.update(state)
-
-        verify(mockApplier).showPartialOverlayBottom80PassThrough()
         verifyNoMoreInteractions(mockApplier)
     }
 

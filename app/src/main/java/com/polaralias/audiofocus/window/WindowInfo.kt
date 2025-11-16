@@ -29,6 +29,7 @@ data class AppWindowInfo(
     val state: WindowState,
     val videoSurfaceFraction: Float,
     val playMode: PlayMode,
+    val selectedMode: PlayMode? = null,
 ) {
     val isVisible: Boolean
         get() = state != WindowState.BACKGROUND

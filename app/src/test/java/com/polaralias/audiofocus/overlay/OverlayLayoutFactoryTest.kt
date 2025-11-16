@@ -27,15 +27,6 @@ class OverlayLayoutFactoryTest {
     }
 
     @Test
-    fun partialMaskCoversFiveSixthsOfScreen() {
-        val state = OverlayState.Partial()
-        val params = OverlayLayoutFactory.maskLayoutFor(context, state)
-        val displayHeight = context.resources.displayMetrics.heightPixels
-        val expected = (displayHeight * state.heightRatio).toInt()
-        assertEquals(expected, params!!.height)
-    }
-
-    @Test
     fun controlsLayoutIsCentered() {
         val params = OverlayLayoutFactory.controlsLayout()
         assertNotNull(params)

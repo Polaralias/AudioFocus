@@ -15,7 +15,6 @@ data class ControlsUiState(
     val canSeekTo: Boolean = false,
     val canSeekBy: Boolean = false,
     val canSeekRelativeOnly: Boolean = false,
-    val isPartialOverlay: Boolean = false,
     val overlayFillMode: OverlayFillMode = OverlayFillMode.SOLID_COLOR,
     val overlayColor: Int = OverlayDefaults.defaultColor,
     val overlayImageUri: Uri? = null,

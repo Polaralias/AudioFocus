@@ -15,7 +15,6 @@ sealed class OverlayCommand {
 
 enum class OverlayMode {
     FULL,
-    PARTIAL,
 }
 
 class OverlayManager {
@@ -100,10 +99,8 @@ class OverlayManager {
         }
     }
 
-    // YouTube Music: Different overlay modes based on window state
-    // - Fullscreen video: full mask overlay
-    // - Miniplayer/non-fullscreen video: partial overlay (5/6 screen height)
-    // - Audio-only or background playback: no overlay (already filtered by content type check)
+    // YouTube Music: Visible video always uses the full mask overlay
+    // Audio-only or background playback: no overlay (already filtered by content type check)
     private fun evaluateYouTubeMusic(state: WindowState): OverlayCommand {
         return when (state) {
             WindowState.FULLSCREEN -> {
@@ -111,12 +108,12 @@ class OverlayManager {
                 OverlayCommand.Show(OverlayMode.FULL)
             }
             WindowState.MINIMIZED -> {
-                Log.d(TAG, "YouTube Music miniplayer detected, showing partial overlay")
-                OverlayCommand.Show(OverlayMode.PARTIAL)
+                Log.d(TAG, "YouTube Music miniplayer detected, showing full overlay")
+                OverlayCommand.Show(OverlayMode.FULL)
             }
             WindowState.PICTURE_IN_PICTURE -> {
-                Log.d(TAG, "YouTube Music PiP detected, showing partial overlay")
-                OverlayCommand.Show(OverlayMode.PARTIAL)
+                Log.d(TAG, "YouTube Music PiP detected, showing full overlay")
+                OverlayCommand.Show(OverlayMode.FULL)
             }
             WindowState.BACKGROUND -> {
                 Log.d(TAG, "YouTube Music background playback detected, hiding overlay")

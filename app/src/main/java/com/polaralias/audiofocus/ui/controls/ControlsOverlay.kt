@@ -48,14 +48,13 @@ fun ControlsOverlay(
 ) {
     val haptic = LocalHapticFeedback.current
     
-    // Adapt sizing based on whether it's a partial overlay
-    val verticalPadding = if (state.isPartialOverlay) 16.dp else 24.dp
-    val horizontalPadding = if (state.isPartialOverlay) 24.dp else 32.dp
-    val buttonSizeSeek = if (state.isPartialOverlay) 56.dp else 64.dp
-    val buttonSizePlay = if (state.isPartialOverlay) 64.dp else 72.dp
-    val iconSizeSeek = if (state.isPartialOverlay) 40.dp else 48.dp
-    val iconSizePlay = if (state.isPartialOverlay) 48.dp else 56.dp
-    val spacerHeight = if (state.isPartialOverlay) 8.dp else 12.dp
+    val verticalPadding = 24.dp
+    val horizontalPadding = 32.dp
+    val buttonSizeSeek = 64.dp
+    val buttonSizePlay = 72.dp
+    val iconSizeSeek = 48.dp
+    val iconSizePlay = 56.dp
+    val spacerHeight = 12.dp
     val baseContentColor = remember(state.contentColor) { Color(state.contentColor) }
     val contentColor = remember(state.overlayColor, state.overlayFillMode, baseContentColor) {
         if (state.overlayFillMode == OverlayFillMode.SOLID_COLOR && state.overlayColor == AndroidColor.BLACK) {
