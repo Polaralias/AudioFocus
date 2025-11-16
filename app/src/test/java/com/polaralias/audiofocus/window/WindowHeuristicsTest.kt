@@ -7,6 +7,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -132,5 +133,96 @@ class WindowHeuristicsTest {
         assertTrue(entry.hasVisibleVideoSurface)
         assertEquals(PlayMode.VIDEO, entry.playMode)
         assertEquals(null, result.focusedPackage)
+    }
+
+    @Test
+    fun evaluate_keepsSnapshotAcrossTransientSystemUi() {
+        var now = 0L
+        val heuristics = WindowHeuristics(context) { now }
+
+        val youtubeWindow = createWindow(
+            id = 100,
+            packageName = "com.google.android.youtube",
+            bounds = Rect(0, 0, metrics.widthPixels, metrics.heightPixels),
+            isActive = true,
+        )
+
+        val initial = heuristics.evaluate(listOf(youtubeWindow), metrics)
+        assertNotNull(initial.appWindows["com.google.android.youtube"])
+
+        val systemUiWindow = createWindow(
+            id = 200,
+            packageName = "com.android.systemui",
+            type = AccessibilityWindowInfo.TYPE_SYSTEM,
+            title = "Notification shade",
+        )
+
+        now += 32
+        val cached = heuristics.evaluate(listOf(systemUiWindow), metrics)
+        assertNotEquals(WindowInfo.Empty, cached)
+        assertNotNull(cached.appWindows["com.google.android.youtube"])
+
+        now += 800
+        val expired = heuristics.evaluate(listOf(systemUiWindow), metrics)
+        assertEquals(WindowInfo.Empty, expired)
+    }
+
+    @Test
+    fun evaluate_clearsSnapshotWhenBackgroundDetected() {
+        var now = 0L
+        val heuristics = WindowHeuristics(context) { now }
+
+        val visibleWindow = createWindow(
+            id = 101,
+            packageName = "com.google.android.youtube",
+            bounds = Rect(0, 0, metrics.widthPixels, metrics.heightPixels),
+            isActive = true,
+        )
+        heuristics.evaluate(listOf(visibleWindow), metrics)
+
+        val backgroundWindow = createWindow(
+            id = 102,
+            packageName = "com.google.android.youtube",
+            bounds = Rect(0, 0, 1, 1),
+            isActive = true,
+        )
+
+        val backgroundResult = heuristics.evaluate(listOf(backgroundWindow), metrics)
+        assertEquals(WindowInfo.Empty, backgroundResult)
+
+        val systemUiWindow = createWindow(
+            id = 201,
+            packageName = "com.android.systemui",
+            type = AccessibilityWindowInfo.TYPE_SYSTEM,
+            title = "Volume",
+        )
+        now += 10
+        val afterBackground = heuristics.evaluate(listOf(systemUiWindow), metrics)
+        assertEquals(WindowInfo.Empty, afterBackground)
+    }
+
+    private fun createWindow(
+        id: Int,
+        packageName: String,
+        type: Int = AccessibilityWindowInfo.TYPE_APPLICATION,
+        bounds: Rect = Rect(0, 0, metrics.widthPixels, metrics.heightPixels),
+        isActive: Boolean = false,
+        title: String? = null,
+    ): AccessibilityWindowInfo {
+        val window = mock<AccessibilityWindowInfo> {
+            on { this.id } doReturn id
+            on { this.type } doReturn type
+            on { this.isActive } doReturn isActive
+            on { this.title } doReturn title
+            on { this.root } doAnswer {
+                AccessibilityNodeInfo.obtain().apply { this.packageName = packageName }
+            }
+        }
+        whenever(window.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(bounds)
+            null
+        }
+        return window
     }
 }
