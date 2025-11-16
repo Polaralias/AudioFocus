@@ -131,27 +131,22 @@ fun ControlsOverlay(
                 }
             }
             Spacer(modifier = Modifier.height(spacerHeight))
-            val sliderRangeMax = run {
-                val base = maxOf(state.safeDuration, state.clampedPosition).toFloat().coerceAtLeast(0f)
-                when {
-                    base > 0f -> base
-                    state.canSeekBy -> RELATIVE_SEEK_SLIDER_RANGE
-                    else -> 0f
-                }
-            }
+            val sliderRangeMax = state.safeDuration.takeIf { it > 0L }?.toFloat()?.coerceAtLeast(0f) ?: 0f
             val sliderValue = if (sliderRangeMax <= 0f) {
                 0f
             } else {
                 state.clampedPosition.toFloat().coerceIn(0f, sliderRangeMax)
             }
-            val sliderEnabled = state.canSeekBy || (state.isPlaying && state.canSeek && sliderRangeMax > 0f)
+            val sliderEnabled = state.isSliderEnabled && sliderRangeMax > 0f
+            val sliderActiveColor = if (sliderEnabled) contentColor else contentColor.copy(alpha = 0.38f)
+            val sliderInactiveColor = if (sliderEnabled) contentColor.copy(alpha = 0.24f) else contentColor.copy(alpha = 0.18f)
             Slider(
                 value = sliderValue,
                 onValueChange = { newValue ->
                     if (!sliderEnabled) return@Slider
                     val target = newValue.roundToInt().toLong()
                     var handled = false
-                    if (sliderRangeMax > 0f) {
+                    if (state.canSeekTo) {
                         handled = try {
                             onSeekTo(target)
                             true
@@ -173,11 +168,11 @@ fun ControlsOverlay(
                 enabled = sliderEnabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = contentColor,
-                    activeTrackColor = contentColor,
-                    activeTickColor = contentColor.copy(alpha = 0.6f),
-                    inactiveTrackColor = contentColor.copy(alpha = 0.24f),
-                    inactiveTickColor = contentColor.copy(alpha = 0.24f)
+                    thumbColor = sliderActiveColor,
+                    activeTrackColor = sliderActiveColor,
+                    activeTickColor = sliderActiveColor.copy(alpha = 0.6f),
+                    inactiveTrackColor = sliderInactiveColor,
+                    inactiveTickColor = sliderInactiveColor
                 )
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -200,7 +195,6 @@ fun ControlsOverlay(
     }
 }
 
-private const val RELATIVE_SEEK_SLIDER_RANGE = 10_000f
 private const val TAG = "ControlsOverlay"
 
 private fun formatTimestamp(millis: Long): String {
