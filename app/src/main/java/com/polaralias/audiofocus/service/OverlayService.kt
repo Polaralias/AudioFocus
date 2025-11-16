@@ -453,12 +453,13 @@ class OverlayService : LifecycleService() {
     private fun applyOverlayStateImmediate(state: OverlayState, isPlaying: Boolean) {
         Log.d(TAG, "Applying overlay state: $state (isPlaying=$isPlaying)")
         
+        updateMaskForState(state)
+
         when (state) {
             OverlayState.None -> setOverlayVisibility(visible = false, isPlaying)
             else -> {
-                updateMaskForState(state)
                 setOverlayVisibility(visible = true, isPlaying)
-                
+
                 // Track when overlay became visible for grace period
                 if (lastVisibleState is OverlayState.None) {
                     lastVisibleTimestamp = System.currentTimeMillis()
@@ -620,19 +621,14 @@ class OverlayService : LifecycleService() {
                 applyPreferences(scope, latestPreferences)
             }
             
-            // Use Fullscreen state for initial layout params (will be updated later based on actual state)
-            // Fullscreen params work for all states as they cover the entire screen
+            // Use a pass-through layout initially so touches are not blocked until the policy enables the mask
             try {
                 Log.d(TAG, "Creating mask layout parameters")
-                val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.Fullscreen)
-                if (maskParams != null) {
-                    Log.d(TAG, "Adding mask view to WindowManager")
-                    windowManager.addView(maskFrame, maskParams)
-                    maskView = maskFrame
-                    Log.i(TAG, "Mask view attached successfully")
-                } else {
-                    Log.e(TAG, "Failed to create mask layout parameters - maskParams is null")
-                }
+                val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.None)
+                Log.d(TAG, "Adding mask view to WindowManager")
+                windowManager.addView(maskFrame, maskParams)
+                maskView = maskFrame
+                Log.i(TAG, "Mask view attached successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error attaching mask view to WindowManager", e)
             }
@@ -699,12 +695,8 @@ class OverlayService : LifecycleService() {
             // Update layout parameters if state changed
             try {
                 val params = OverlayLayoutFactory.maskLayoutFor(this, state)
-                if (params != null) {
-                    windowManager.updateViewLayout(mask, params)
-                    Log.d(TAG, "Mask layout parameters updated successfully")
-                } else {
-                    Log.w(TAG, "Failed to get layout parameters for state: $state")
-                }
+                windowManager.updateViewLayout(mask, params)
+                Log.d(TAG, "Mask layout parameters updated successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating mask layout parameters", e)
             }
