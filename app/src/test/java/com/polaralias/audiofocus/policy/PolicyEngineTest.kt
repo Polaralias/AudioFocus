@@ -1,10 +1,10 @@
 package com.polaralias.audiofocus.policy
 
-import android.media.MediaMetadata
 import android.media.session.PlaybackState
 import com.polaralias.audiofocus.data.OverlayPreferences
 import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.window.AppWindowInfo
+import com.polaralias.audiofocus.window.PlayMode
 import com.polaralias.audiofocus.window.WindowInfo
 import com.polaralias.audiofocus.window.WindowState
 import org.junit.Assert.assertEquals
@@ -56,7 +56,8 @@ class PolicyEngineTest {
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.youtube",
                 state = WindowState.PICTURE_IN_PICTURE,
-                hasVideoSurface = false,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.VIDEO,
             ),
             preferences = prefs,
         )
@@ -74,7 +75,8 @@ class PolicyEngineTest {
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.youtube",
                 state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = false,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.VIDEO,
             ),
             preferences = prefs,
         )
@@ -119,11 +121,12 @@ class PolicyEngineTest {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
-            metadata = videoMetadata(),
+            metadata = null,
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.apps.youtube.music",
                 state = WindowState.FULLSCREEN,
-                hasVideoSurface = true
+                videoSurfaceFraction = 0.5f,
+                playMode = PlayMode.VIDEO,
             ),
             preferences = prefs
         )
@@ -133,38 +136,18 @@ class PolicyEngineTest {
     }
 
     @Test
-    fun youtubeMusicMiniplayerVideoShowsPartialOverlay() {
+    fun youtubeMusicMiniplayerVideoShowsFullscreenOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
-            metadata = videoMetadata(),
+            metadata = null,
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.apps.youtube.music",
                 state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = true
+                videoSurfaceFraction = 0.5f,
+                playMode = PlayMode.VIDEO,
             ),
             preferences = prefs
-        )
-
-        val result = PolicyEngine.compute(input)
-        assertEquals(
-            OverlayState.Partial(heightRatio = 0.8f),
-            result
-        )
-    }
-
-    @Test
-    fun youtubeMusicFullscreenWithEmptyMetadataUsesSurfaceSignal() {
-        val input = PolicyInput(
-            packageName = "com.google.android.apps.youtube.music",
-            playbackState = playingState,
-            metadata = emptyMetadata(),
-            windowInfo = windowInfoFor(
-                pkg = "com.google.android.apps.youtube.music",
-                state = WindowState.FULLSCREEN,
-                hasVideoSurface = true,
-            ),
-            preferences = prefs,
         )
 
         val result = PolicyEngine.compute(input)
@@ -172,87 +155,82 @@ class PolicyEngineTest {
     }
 
     @Test
-    fun youtubeMusicMiniplayerWithEmptyMetadataUsesSurfaceSignal() {
+    fun youtubeMusicPiPVideoShowsFullscreenOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
-            metadata = emptyMetadata(),
-            windowInfo = windowInfoFor(
-                pkg = "com.google.android.apps.youtube.music",
-                state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = true,
-            ),
-            preferences = prefs,
-        )
-
-        val result = PolicyEngine.compute(input)
-        assertEquals(
-            OverlayState.Partial(heightRatio = 0.8f),
-            result
-        )
-    }
-
-    @Test
-    fun youtubeMusicPiPVideoShowsPartialOverlayEvenWithoutSurface() {
-        val input = PolicyInput(
-            packageName = "com.google.android.apps.youtube.music",
-            playbackState = playingState,
-            metadata = videoMetadata(),
+            metadata = null,
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.apps.youtube.music",
                 state = WindowState.PICTURE_IN_PICTURE,
-                hasVideoSurface = false,
-            ),
-            preferences = prefs,
-        )
-
-        val result = PolicyEngine.compute(input)
-        assertEquals(
-            OverlayState.Partial(heightRatio = 0.8f),
-            result
-        )
-    }
-
-    @Test
-    fun youtubeMusicPiPAudioMetadataUsesPartialOverlay() {
-        val input = PolicyInput(
-            packageName = "com.google.android.apps.youtube.music",
-            playbackState = playingState,
-            metadata = audioMetadata(),
-            windowInfo = windowInfoFor(
-                pkg = "com.google.android.apps.youtube.music",
-                state = WindowState.PICTURE_IN_PICTURE,
-                hasVideoSurface = false,
-            ),
-            preferences = prefs,
-        )
-
-        val result = PolicyEngine.compute(input)
-        assertEquals(
-            OverlayState.Partial(heightRatio = 0.8f),
-            result
-        )
-    }
-
-    @Test
-    fun youtubeMusicAudioMetadataWithSurfaceUsesPartialOverlay() {
-        val input = PolicyInput(
-            packageName = "com.google.android.apps.youtube.music",
-            playbackState = playingState,
-            metadata = audioMetadata(),
-            windowInfo = windowInfoFor(
-                pkg = "com.google.android.apps.youtube.music",
-                state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = true
+                videoSurfaceFraction = 0.15f,
+                playMode = PlayMode.VIDEO,
             ),
             preferences = prefs
         )
 
         val result = PolicyEngine.compute(input)
-        assertEquals(
-            OverlayState.Partial(heightRatio = 0.8f),
-            result
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
+    fun youtubeMusicVideoSelectionOverridesSurface() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = PlayMode.VIDEO,
+            ),
+            preferences = prefs
         )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
+    fun youtubeMusicAudioSelectionWithoutSurfaceHidesOverlay() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = PlayMode.AUDIO,
+            ),
+            preferences = prefs
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.None, result)
+    }
+
+    @Test
+    fun youtubeMusicTinySurfaceWithoutSelectionHidesOverlay() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = null,
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                videoSurfaceFraction = 0.005f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = null,
+            ),
+            preferences = prefs
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.None, result)
     }
 
     @Test
@@ -260,7 +238,7 @@ class PolicyEngineTest {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
-            metadata = videoMetadata(),
+            metadata = null,
             windowInfo = WindowInfo.Empty,
             preferences = prefs
         )
@@ -278,7 +256,8 @@ class PolicyEngineTest {
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.youtube",
                 state = WindowState.FULLSCREEN,
-                hasVideoSurface = false
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
             ),
             preferences = prefs
         )
@@ -292,11 +271,13 @@ class PolicyEngineTest {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
             playbackState = playingState,
-            metadata = videoMetadata(),
+            metadata = null,
             windowInfo = windowInfoFor(
                 pkg = "com.google.android.apps.youtube.music",
                 state = WindowState.MINIMIZED_IN_APP,
-                hasVideoSurface = false
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = null,
             ),
             preferences = prefs
         )
@@ -325,37 +306,21 @@ class PolicyEngineTest {
     private fun windowInfoFor(
         pkg: String,
         state: WindowState,
-        hasVideoSurface: Boolean = true,
+        videoSurfaceFraction: Float = 0.5f,
+        playMode: PlayMode = if (videoSurfaceFraction > 0f) PlayMode.VIDEO else PlayMode.AUDIO,
+        selectedMode: PlayMode? = null,
     ): WindowInfo {
         return WindowInfo(
             focusedPackage = pkg,
-            appWindows = mapOf(pkg to AppWindowInfo(pkg, state, hasVideoSurface))
+            appWindows = mapOf(
+                pkg to AppWindowInfo(
+                    packageName = pkg,
+                    state = state,
+                    videoSurfaceFraction = videoSurfaceFraction,
+                    playMode = playMode,
+                    selectedMode = selectedMode,
+                )
+            )
         )
-    }
-
-    private fun videoMetadata(): MediaMetadata {
-        return MediaMetadata.Builder()
-            .putLong(METADATA_KEY_VIDEO_WIDTH, 1920)
-            .putLong(METADATA_KEY_VIDEO_HEIGHT, 1080)
-            .putLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE, 1)
-            .build()
-    }
-
-    private fun audioMetadata(): MediaMetadata {
-        return MediaMetadata.Builder()
-            .putLong(METADATA_KEY_VIDEO_WIDTH, 0)
-            .putLong(METADATA_KEY_VIDEO_HEIGHT, 0)
-            .putLong(METADATA_KEY_PRESENTATION_DISPLAY_TYPE, 0)
-            .build()
-    }
-
-    private fun emptyMetadata(): MediaMetadata {
-        return MediaMetadata.Builder().build()
-    }
-
-    companion object {
-        private const val METADATA_KEY_VIDEO_WIDTH = "android.media.metadata.VIDEO_WIDTH"
-        private const val METADATA_KEY_VIDEO_HEIGHT = "android.media.metadata.VIDEO_HEIGHT"
-        private const val METADATA_KEY_PRESENTATION_DISPLAY_TYPE = "android.media.metadata.PRESENTATION_DISPLAY_TYPE"
     }
 }

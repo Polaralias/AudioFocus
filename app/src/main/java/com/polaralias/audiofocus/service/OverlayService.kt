@@ -551,7 +551,6 @@ class OverlayService : LifecycleService() {
             canSeekTo = capabilities.supportsSeekTo,
             canSeekBy = capabilities.canSeekBy,
             canSeekRelativeOnly = capabilities.canSeekRelativeOnly,
-            isPartialOverlay = overlayState is OverlayState.Partial,
             overlayFillMode = preferences.fillMode,
             overlayColor = preferences.overlayColor,
             overlayImageUri = preferences.imageUri,

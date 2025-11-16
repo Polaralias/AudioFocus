@@ -24,12 +24,6 @@ object OverlayLayoutFactory {
                     gravity = Gravity.TOP
                 )
             }
-            is OverlayState.Partial -> {
-                val displayHeight = context.resources.displayMetrics.heightPixels
-                val height = (displayHeight * state.heightRatio).toInt()
-                Log.d(TAG, "Creating partial mask layout: heightRatio=${state.heightRatio}, height=$height px")
-                createMaskLayout(context, height = height, gravity = Gravity.BOTTOM)
-            }
         }
     }
 

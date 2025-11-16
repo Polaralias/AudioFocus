@@ -86,6 +86,7 @@ class WindowHeuristics(context: Context) {
                         state = state,
                         videoSurfaceFraction = videoSurfaceFraction,
                         playMode = playMode,
+                        selectedMode = analysis.selectedMode,
                     ),
                     coverage = coverage,
                 )
@@ -200,6 +201,7 @@ class WindowHeuristics(context: Context) {
         return WindowAnalysis(
             videoSurfaceFraction = maxSurfaceFraction,
             playMode = playMode,
+            selectedMode = youtubeMusicSelection,
         )
     }
 
@@ -381,6 +383,7 @@ class WindowHeuristics(context: Context) {
 private data class WindowAnalysis(
     val videoSurfaceFraction: Float,
     val playMode: PlayMode,
+    val selectedMode: PlayMode?,
 )
 
 data class VideoHeuristics(

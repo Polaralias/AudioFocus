@@ -118,33 +118,33 @@ class OverlayPolicyTest {
     }
 
     @Test
-    fun `youtube music minimized in-app with video shows partial overlay`() {
+    fun `youtube music minimized in-app with video shows full overlay`() {
         val state = ContextState(
             app = App.YTMUSIC,
             windowState = WindowState.MINIMIZED_IN_APP,
             playback = Playback.PLAYING_VIDEO_VISIBLE
         )
-        assertEquals(OverlayBehaviour.PARTIAL_80_PASS_THROUGH, OverlayPolicy.decideOverlay(state))
+        assertEquals(OverlayBehaviour.FULL_SCREEN_OVERLAY, OverlayPolicy.decideOverlay(state))
     }
 
     @Test
-    fun `youtube music non-fullscreen video shows partial overlay`() {
+    fun `youtube music non-fullscreen video shows full overlay`() {
         val state = ContextState(
             app = App.YTMUSIC,
             windowState = WindowState.NON_FULLSCREEN_VIDEO,
             playback = Playback.PLAYING_VIDEO_VISIBLE
         )
-        assertEquals(OverlayBehaviour.PARTIAL_80_PASS_THROUGH, OverlayPolicy.decideOverlay(state))
+        assertEquals(OverlayBehaviour.FULL_SCREEN_OVERLAY, OverlayPolicy.decideOverlay(state))
     }
 
     @Test
-    fun `youtube music pip with video shows partial overlay`() {
+    fun `youtube music pip with video shows full overlay`() {
         val state = ContextState(
             app = App.YTMUSIC,
             windowState = WindowState.PIP,
             playback = Playback.PLAYING_VIDEO_VISIBLE
         )
-        assertEquals(OverlayBehaviour.PARTIAL_80_PASS_THROUGH, OverlayPolicy.decideOverlay(state))
+        assertEquals(OverlayBehaviour.FULL_SCREEN_OVERLAY, OverlayPolicy.decideOverlay(state))
     }
 
     @Test
@@ -278,10 +278,10 @@ class OverlayPolicyTest {
             // YouTube Music: Fullscreen video | Video playback | Full-screen overlay
             Triple(WindowState.FULLSCREEN, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
 
-            // YouTube Music: Miniplayer or non-fullscreen video | Video playback | Partial overlay covering bottom 80%
-            Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.PARTIAL_80_PASS_THROUGH),
-            Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.PARTIAL_80_PASS_THROUGH),
-            Triple(WindowState.PIP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.PARTIAL_80_PASS_THROUGH),
+            // YouTube Music: Miniplayer or non-fullscreen video | Video playback | Full-screen overlay
+            Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
+            Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
+            Triple(WindowState.PIP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
 
             // YouTube Music: Background | Background playback | No overlay
             Triple(WindowState.BACKGROUND, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),

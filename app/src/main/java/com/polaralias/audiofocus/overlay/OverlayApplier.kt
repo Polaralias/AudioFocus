@@ -1,7 +1,6 @@
 package com.polaralias.audiofocus.overlay
 
 import android.content.Context
-import android.content.res.Resources
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.View
@@ -28,24 +27,6 @@ class OverlayApplier(
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
-        attachOrUpdate(lp)
-    }
-
-    fun showPartialOverlayBottom80PassThrough() {
-        val dm = Resources.getSystem().displayMetrics
-        val height = (dm.heightPixels * 0.8f).toInt()
-        val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            height,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.BOTTOM
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }

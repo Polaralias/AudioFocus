@@ -11,7 +11,6 @@ class OverlayController(
         lastBehaviour = behaviour
         when (behaviour) {
             OverlayBehaviour.FULL_SCREEN_OVERLAY -> applier.showFullScreenOverlay()
-            OverlayBehaviour.PARTIAL_80_PASS_THROUGH -> applier.showPartialOverlayBottom80PassThrough()
             OverlayBehaviour.NONE -> applier.hideOverlay()
         }
     }
