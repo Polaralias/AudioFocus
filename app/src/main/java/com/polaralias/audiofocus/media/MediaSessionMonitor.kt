@@ -12,6 +12,7 @@ import com.polaralias.audiofocus.model.MediaState
 import com.polaralias.audiofocus.service.AccessWindowsService
 import com.polaralias.audiofocus.state.SupportedApp
 import com.polaralias.audiofocus.state.toSupportedApp
+import com.polaralias.audiofocus.window.WindowInferenceStore
 import com.polaralias.audiofocus.window.WindowState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +107,7 @@ class MediaSessionMonitor(
         controller?.unregisterCallback(callback)
         controller = target
         target?.registerCallback(callback)
+        WindowInferenceStore.setActiveMediaPackage(target?.packageName)
         publish(target)
     }
 
