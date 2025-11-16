@@ -2,6 +2,7 @@ package com.polaralias.audiofocus.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
@@ -131,7 +132,9 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
 
                 val bounds = Rect().also(windowInfo::getBoundsInScreen)
                 val coverage = calculateCoverage(bounds, screenArea)
-                val isPipWindow = windowInfo.type == AccessibilityWindowInfo.TYPE_PICTURE_IN_PICTURE ||
+                // Guard TYPE_PICTURE_IN_PICTURE usage (API 26+) to ensure compilation compatibility
+                val isPipWindow = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                        windowInfo.type == TYPE_PICTURE_IN_PICTURE) ||
                     (coverage != null && coverage < PIP_COVERAGE_THRESHOLD)
                 if (isPipWindow) {
                     Log.d(
@@ -236,5 +239,9 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
         private const val FULLSCREEN_COVERAGE_THRESHOLD = 0.75f
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
         private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
+        
+        // TYPE_PICTURE_IN_PICTURE constant value from AccessibilityWindowInfo (API 26+)
+        // Defined locally as it may not be available in SDK stubs
+        private const val TYPE_PICTURE_IN_PICTURE = 4
     }
 }
