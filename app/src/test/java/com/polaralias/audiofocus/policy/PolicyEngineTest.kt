@@ -1,7 +1,9 @@
 package com.polaralias.audiofocus.policy
 
+import android.media.MediaMetadata
 import android.media.session.PlaybackState
 import com.polaralias.audiofocus.data.OverlayPreferences
+import com.polaralias.audiofocus.media.YouTubeMusicMetadata
 import com.polaralias.audiofocus.model.OverlayState
 import com.polaralias.audiofocus.window.AppWindowInfo
 import com.polaralias.audiofocus.window.PlayMode
@@ -214,6 +216,46 @@ class PolicyEngineTest {
     }
 
     @Test
+    fun youtubeMusicMiniplayerVideoUsesMetadataWhenSurfaceMissing() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = youtubeMusicVideoMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.MINIMIZED_IN_APP,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = null,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
+    fun youtubeMusicPipVideoUsesMetadataWhenSurfaceMissing() {
+        val input = PolicyInput(
+            packageName = "com.google.android.apps.youtube.music",
+            playbackState = playingState,
+            metadata = youtubeMusicVideoMetadata(),
+            windowInfo = windowInfoFor(
+                pkg = "com.google.android.apps.youtube.music",
+                state = WindowState.PICTURE_IN_PICTURE,
+                videoSurfaceFraction = 0f,
+                playMode = PlayMode.AUDIO,
+                selectedMode = null,
+            ),
+            preferences = prefs,
+        )
+
+        val result = PolicyEngine.compute(input)
+        assertEquals(OverlayState.Fullscreen, result)
+    }
+
+    @Test
     fun youtubeMusicTinySurfaceWithoutSelectionHidesOverlay() {
         val input = PolicyInput(
             packageName = "com.google.android.apps.youtube.music",
@@ -322,5 +364,13 @@ class PolicyEngineTest {
                 )
             )
         )
+    }
+
+    private fun youtubeMusicVideoMetadata(): MediaMetadata {
+        return MediaMetadata.Builder()
+            .putLong(YouTubeMusicMetadata.METADATA_KEY_VIDEO_WIDTH, 1920L)
+            .putLong(YouTubeMusicMetadata.METADATA_KEY_VIDEO_HEIGHT, 1080L)
+            .putLong(YouTubeMusicMetadata.METADATA_KEY_PRESENTATION_DISPLAY_TYPE, YouTubeMusicMetadata.PRESENTATION_DISPLAY_TYPE_VIDEO)
+            .build()
     }
 }
