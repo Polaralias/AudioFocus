@@ -37,11 +37,11 @@ class SeekCapabilitySnapshotTest {
     }
 
     @Test
-    fun treatsSeekForwardBackwardAsSeekToIndicators() {
+    fun treatsSeekForwardBackwardAsRelativeOnlyIndicators() {
         val snapshot = resolveSeekCapabilities(actions = ACTION_SEEK_FORWARD)
 
-        assertTrue(snapshot.supportsSeekTo)
+        assertFalse(snapshot.supportsSeekTo)
         assertTrue(snapshot.supportsRelativeSeek)
-        assertFalse(snapshot.canSeekRelativeOnly)
+        assertTrue(snapshot.canSeekRelativeOnly)
     }
 }

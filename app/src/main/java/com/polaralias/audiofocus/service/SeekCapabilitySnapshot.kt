@@ -12,9 +12,7 @@ internal data class SeekCapabilitySnapshot(
 
 internal fun resolveSeekCapabilities(actions: Long): SeekCapabilitySnapshot {
     val supportsSeekTo = actions.hasAny(
-        PlaybackState.ACTION_SEEK_TO,
-        ACTION_SEEK_FORWARD,
-        ACTION_SEEK_BACKWARD
+        PlaybackState.ACTION_SEEK_TO
     )
     val supportsRelativeSeek = actions.hasAny(
         PlaybackState.ACTION_FAST_FORWARD,
