@@ -22,7 +22,7 @@ class WindowHeuristics(
     private val heuristics: VideoHeuristics = loadHeuristics(context)
     private val surfaceHints: List<SurfaceHint> =
         (heuristics.surfaceHints + EXTRA_SURFACE_HINTS).ifEmpty { FALLBACK_HINTS + EXTRA_SURFACE_HINTS }
-    private val lastKnownPackageByWindowId = mutableMapOf<Int, String>()
+    private val inferenceStore = WindowInferenceStore
     private var lastKnownFocusedPackage: String? = null
     private var lastVisibleSnapshot: WindowInfo = WindowInfo.Empty
     private var lastVisibleSnapshotTimestamp: Long = 0L
@@ -34,7 +34,7 @@ class WindowHeuristics(
         val windowList = windows.orEmpty()
         val observedWindowIds = mutableSetOf<Int>()
         if (windowList.isEmpty()) {
-            lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
+            inferenceStore.retainWindowIds(observedWindowIds)
             return resolveEmptyResult(CacheReason.NO_WINDOWS)
         }
 
@@ -43,12 +43,16 @@ class WindowHeuristics(
         var sawTransientSystemWindow = false
         var sawNonTransientWindow = false
 
+        val packagesByBounds = mutableMapOf<BoundsSignature, String>()
+        val pendingPipWindows = mutableListOf<PendingPipWindow>()
+
         windowList.forEach { window ->
             val windowId = window.id
             observedWindowIds += windowId
 
             val bounds = Rect().also(window::getBoundsInScreen)
             val coverage = coverage(bounds, metrics)
+            val boundsSignature = BoundsSignature.from(bounds)
             val state = determineWindowState(window, coverage)
 
             val root = window.root
@@ -61,28 +65,13 @@ class WindowHeuristics(
             }
             if (root == null) {
                 if (state == WindowState.PICTURE_IN_PICTURE) {
-                    val fallbackPackage = lastKnownPackageByWindowId[windowId]
-                        ?: focusedPackage
-                        ?: lastKnownFocusedPackage
-                    if (!fallbackPackage.isNullOrEmpty() && fallbackPackage in SUPPORTED_PACKAGES) {
-                        if (window.isActive && focusedPackage == null) {
-                            focusedPackage = fallbackPackage
-                        }
-                        val candidate = WindowCandidate(
-                            info = AppWindowInfo(
-                                packageName = fallbackPackage,
-                                state = WindowState.PICTURE_IN_PICTURE,
-                                videoSurfaceFraction = coverage.coerceIn(0f, 1f),
-                                playMode = PlayMode.VIDEO,
-                            ),
-                            coverage = coverage,
-                        )
-                        val existing = bestByPackage[fallbackPackage]
-                        if (existing == null || candidate.isBetterThan(existing)) {
-                            bestByPackage[fallbackPackage] = candidate
-                        }
-                        lastKnownPackageByWindowId[windowId] = fallbackPackage
-                    }
+                    pendingPipWindows += PendingPipWindow(
+                        id = windowId,
+                        coverage = coverage,
+                        boundsSignature = boundsSignature,
+                        isActive = window.isActive,
+                        title = window.title?.toString(),
+                    )
                 }
                 return@forEach
             }
@@ -119,16 +108,58 @@ class WindowHeuristics(
                 if (existing == null || candidate.isBetterThan(existing)) {
                     bestByPackage[packageName] = candidate
                 }
-                lastKnownPackageByWindowId[windowId] = packageName
+                inferenceStore.rememberWindowPackage(windowId, packageName)
+                packagesByBounds[boundsSignature] = packageName
             } finally {
                 root.recycle()
+            }
+        }
+
+        if (pendingPipWindows.isNotEmpty()) {
+            val activeMediaPackage = inferenceStore.activeMediaPackage()
+            pendingPipWindows.forEach { pending ->
+                val inference = inferPackageForPiP(
+                    pending = pending,
+                    packagesByBounds = packagesByBounds,
+                    focusedPackage = focusedPackage,
+                    activeMediaPackage = activeMediaPackage,
+                )
+                val inferredPackage = inference?.packageName
+                if (inferredPackage == null) {
+                    Log.w(
+                        TAG,
+                        "Unable to infer package for PiP window ${pending.id} title='${pending.title}'"
+                    )
+                    return@forEach
+                }
+                if (pending.isActive && focusedPackage == null) {
+                    focusedPackage = inferredPackage
+                }
+                val candidate = WindowCandidate(
+                    info = AppWindowInfo(
+                        packageName = inferredPackage,
+                        state = WindowState.PICTURE_IN_PICTURE,
+                        videoSurfaceFraction = pending.coverage.coerceIn(0f, 1f),
+                        playMode = PlayMode.VIDEO,
+                    ),
+                    coverage = pending.coverage,
+                )
+                val existing = bestByPackage[inferredPackage]
+                if (existing == null || candidate.isBetterThan(existing)) {
+                    bestByPackage[inferredPackage] = candidate
+                }
+                inferenceStore.rememberWindowPackage(pending.id, inferredPackage)
+                Log.i(
+                    TAG,
+                    "Inferred PiP window ${pending.id} -> $inferredPackage via ${inference.reason}"
+                )
             }
         }
 
         val supportedFocusedPackage = focusedPackage?.takeIf { it in SUPPORTED_PACKAGES }
 
         lastKnownFocusedPackage = supportedFocusedPackage ?: lastKnownFocusedPackage
-        lastKnownPackageByWindowId.keys.retainAll(observedWindowIds)
+        inferenceStore.retainWindowIds(observedWindowIds)
 
         if (bestByPackage.isEmpty()) {
             val reason = if (sawTransientSystemWindow && !sawNonTransientWindow) {
@@ -152,6 +183,43 @@ class WindowHeuristics(
 
         clearSnapshot(CacheReason.BACKGROUND)
         return WindowInfo.Empty
+    }
+
+    private fun inferPackageForPiP(
+        pending: PendingPipWindow,
+        packagesByBounds: Map<BoundsSignature, String>,
+        focusedPackage: String?,
+        activeMediaPackage: String?,
+    ): PipInferenceResult? {
+        val orderedCandidates = listOfNotNull(
+            inferenceStore.lastKnownPackage(pending.id)?.let {
+                PipInferenceResult(it, PipInferenceReason.LAST_KNOWN_WINDOW)
+            },
+            inferPackageFromTitle(pending.title)?.let {
+                PipInferenceResult(it, PipInferenceReason.TITLE_HINT)
+            },
+            packagesByBounds[pending.boundsSignature]?.let {
+                PipInferenceResult(it, PipInferenceReason.BOUNDS_MATCH)
+            },
+            activeMediaPackage?.let {
+                PipInferenceResult(it, PipInferenceReason.ACTIVE_MEDIA_SESSION)
+            },
+            focusedPackage?.let { PipInferenceResult(it, PipInferenceReason.FOCUSED_PACKAGE) },
+            lastKnownFocusedPackage?.let {
+                PipInferenceResult(it, PipInferenceReason.LAST_FOCUSED_PACKAGE)
+            },
+        )
+        return orderedCandidates.firstOrNull { it.packageName in SUPPORTED_PACKAGES }
+    }
+
+    private fun inferPackageFromTitle(title: String?): String? {
+        if (title.isNullOrEmpty()) return null
+        val normalized = title.lowercase(Locale.US)
+        return when {
+            normalized.contains("youtube music") -> YOUTUBE_MUSIC
+            normalized.contains("youtube") -> YOUTUBE
+            else -> null
+        }
     }
 
     private fun resolveEmptyResult(reason: CacheReason): WindowInfo {
@@ -513,6 +581,41 @@ class WindowHeuristics(
         private val TRANSIENT_SYSTEM_PACKAGES = setOf("com.android.systemui")
         private val TRANSIENT_TITLE_KEYWORDS = listOf("notification", "volume", "controls", "screenshot")
     }
+}
+
+private data class PendingPipWindow(
+    val id: Int,
+    val coverage: Float,
+    val boundsSignature: BoundsSignature,
+    val isActive: Boolean,
+    val title: String?,
+)
+
+private data class BoundsSignature(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+) {
+    companion object {
+        fun from(rect: Rect): BoundsSignature {
+            return BoundsSignature(rect.left, rect.top, rect.right, rect.bottom)
+        }
+    }
+}
+
+private data class PipInferenceResult(
+    val packageName: String,
+    val reason: PipInferenceReason,
+)
+
+private enum class PipInferenceReason {
+    LAST_KNOWN_WINDOW,
+    TITLE_HINT,
+    BOUNDS_MATCH,
+    ACTIVE_MEDIA_SESSION,
+    FOCUSED_PACKAGE,
+    LAST_FOCUSED_PACKAGE,
 }
 
 private data class WindowAnalysis(

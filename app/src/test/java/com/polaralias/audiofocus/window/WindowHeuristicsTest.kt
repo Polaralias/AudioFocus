@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
@@ -27,6 +28,11 @@ class WindowHeuristicsTest {
     private val metrics = DisplayMetrics().apply {
         widthPixels = 1080
         heightPixels = 1920
+    }
+
+    @Before
+    fun resetInferenceStore() {
+        WindowInferenceStore.resetForTests()
     }
 
     @Test
@@ -71,6 +77,77 @@ class WindowHeuristicsTest {
         assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
         assertTrue(entry.hasVisibleVideoSurface)
         assertEquals(PlayMode.VIDEO, entry.playMode)
+    }
+
+    @Test
+    fun evaluate_infersPiPWindowFromTitleOnColdStart() {
+        val heuristics = WindowHeuristics(context)
+
+        val pipWindowWithoutRoot = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(42)
+            on { type } doReturn(TYPE_PINNED)
+            on { isActive } doReturn(true)
+            on { root } doReturn(null)
+            on { title } doReturn("YouTube")
+        }
+        whenever(pipWindowWithoutRoot.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, 200, 200)
+            null
+        }
+
+        val result = heuristics.evaluate(listOf(pipWindowWithoutRoot), metrics)
+        val entry = result.appWindows["com.google.android.youtube"]
+
+        assertNotNull(entry)
+        entry!!
+        assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
+        assertTrue(entry.hasVisibleVideoSurface)
+        assertEquals(PlayMode.VIDEO, entry.playMode)
+        assertEquals("com.google.android.youtube", result.focusedPackage)
+    }
+
+    @Test
+    fun evaluate_reusesPiPMappingAcrossInstances() {
+        val heuristicsWithRoot = WindowHeuristics(context)
+
+        val rootNode = AccessibilityNodeInfo.obtain().apply {
+            packageName = "com.google.android.youtube"
+        }
+
+        val pipWindowWithRoot = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(77)
+            on { type } doReturn(TYPE_PINNED)
+            on { isActive } doReturn(false)
+            on { root } doReturn(rootNode)
+        }
+        whenever(pipWindowWithRoot.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, 200, 200)
+            null
+        }
+        heuristicsWithRoot.evaluate(listOf(pipWindowWithRoot), metrics)
+
+        val coldStartHeuristics = WindowHeuristics(context)
+        val pipWindowWithoutRoot = mock<AccessibilityWindowInfo> {
+            on { id } doReturn(77)
+            on { type } doReturn(TYPE_PINNED)
+            on { isActive } doReturn(false)
+            on { root } doReturn(null)
+        }
+        whenever(pipWindowWithoutRoot.getBoundsInScreen(any())).thenAnswer { invocation ->
+            val rect = invocation.arguments[0] as Rect
+            rect.set(0, 0, 200, 200)
+            null
+        }
+
+        val result = coldStartHeuristics.evaluate(listOf(pipWindowWithoutRoot), metrics)
+        val entry = result.appWindows["com.google.android.youtube"]
+
+        assertNotNull(entry)
+        entry!!
+        assertEquals(WindowState.PICTURE_IN_PICTURE, entry.state)
+        assertTrue(entry.hasVisibleVideoSurface)
     }
 
     @Test
