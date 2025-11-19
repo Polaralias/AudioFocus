@@ -76,6 +76,20 @@ public class MediaControllerManager {
         return new Metadata(title, artist);
     }
 
+    public long getDuration() {
+        MediaController controller = activeController;
+        if (controller == null) {
+            return 0;
+        }
+
+        MediaMetadata metadata = controller.getMetadata();
+        if (metadata == null) {
+            return 0;
+        }
+
+        return metadata.getLong(MediaMetadata.METADATA_KEY_DURATION);
+    }
+
     public static class Metadata {
         private final String title;
         private final String artist;
