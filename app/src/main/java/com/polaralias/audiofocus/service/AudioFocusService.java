@@ -1,6 +1,7 @@
 package com.polaralias.audiofocus.service;
 
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.media.session.MediaController;
@@ -27,8 +28,9 @@ public class AudioFocusService extends Service implements MediaSessionManager.On
         mainHandler = new Handler(Looper.getMainLooper());
 
         if (mediaSessionManager != null) {
-            mediaSessionManager.addOnActiveSessionsChangedListener(this, null, mainHandler);
-            onActiveSessionsChanged(mediaSessionManager.getActiveSessions(null));
+            ComponentName listenerComponent = new ComponentName(this, MediaNotificationListener.class);
+            mediaSessionManager.addOnActiveSessionsChangedListener(this, listenerComponent, mainHandler);
+            onActiveSessionsChanged(mediaSessionManager.getActiveSessions(listenerComponent));
         }
     }
 
