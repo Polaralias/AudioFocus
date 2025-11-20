@@ -282,8 +282,11 @@ class WindowHeuristics(
             val viewId = node.viewIdResourceName?.lowercase(Locale.US).orEmpty()
             val className = node.className?.toString()?.lowercase(Locale.US).orEmpty()
 
+            val structuralSurface = isStructuralVideoNode(node, className, label)
             val matchedHint = matchSurfaceHint(className, viewId, label)
-            if (matchedHint != null && (node.isVisibleToUser || matchedHint.allowHidden)) {
+            if ((structuralSurface || matchedHint != null) &&
+                (node.isVisibleToUser || matchedHint?.allowHidden == true)
+            ) {
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
                 val width = bounds.width().coerceAtLeast(0)
@@ -332,6 +335,27 @@ class WindowHeuristics(
     ): SurfaceHint? {
         if (surfaceHints.isEmpty()) return null
         return surfaceHints.firstOrNull { it.matches(className, viewId, label) }
+    }
+
+    private fun isStructuralVideoNode(
+        node: AccessibilityNodeInfo,
+        className: String,
+        label: String,
+    ): Boolean {
+        if (className.isEmpty()) return false
+
+        if (className in VIDEO_SURFACE_CLASSES || VIDEO_SURFACE_CLASS_HINTS.any { className.contains(it) }) {
+            return node.isVisibleToUser
+        }
+
+        if (VIDEO_CONTAINER_CLASSES.any { className.contains(it) }) {
+            val description = node.contentDescription?.toString()?.lowercase(Locale.US).orEmpty()
+            if (VIDEO_LABEL_KEYWORDS.any { label.contains(it) || description.contains(it) }) {
+                return node.isVisibleToUser
+            }
+        }
+
+        return false
     }
 
     private fun traverseNodes(root: AccessibilityNodeInfo, visitor: (AccessibilityNodeInfo) -> Unit) {
@@ -546,6 +570,22 @@ class WindowHeuristics(
         private const val CACHE_TIMEOUT_MS = 750L
 
         private const val MAX_SELECTION_PARENT_DEPTH = 5
+
+        private val VIDEO_SURFACE_CLASSES = setOf(
+            "android.view.surfaceview",
+            "android.view.textureview",
+        )
+        private val VIDEO_SURFACE_CLASS_HINTS = listOf(
+            "surfaceview",
+            "textureview",
+            "videoview",
+            "playerview",
+        )
+        private val VIDEO_CONTAINER_CLASSES = listOf(
+            "android.view.viewgroup",
+            "android.widget.framelayout",
+        )
+        private val VIDEO_LABEL_KEYWORDS = listOf("video", "player")
 
         private val STATE_PRIORITY = mapOf(
             WindowState.FULLSCREEN to 3,
