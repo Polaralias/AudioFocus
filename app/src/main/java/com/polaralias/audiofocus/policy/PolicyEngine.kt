@@ -54,33 +54,17 @@ object PolicyEngine {
         }
 
         val state = info.state
-        if (state == WindowState.BACKGROUND) {
-            Log.d(TAG, "YouTube not visible (state=$state), hiding overlay")
-            return OverlayState.None
-        }
-
-        val heuristicsVideo = info.playMode == PlayMode.VIDEO || info.playMode == PlayMode.SHORTS
-        val pipOverride = state == WindowState.PICTURE_IN_PICTURE && info.videoSurfaceFraction > 0f
-
-        if (!heuristicsVideo && !pipOverride) {
-            Log.d(
-                TAG,
-                "YouTube state=$state playMode=${info.playMode} surfaceFraction=${info.videoSurfaceFraction} -> hiding overlay"
-            )
-            return OverlayState.None
-        }
-
         return when (state) {
             WindowState.FULLSCREEN,
             WindowState.MINIMIZED_IN_APP,
             WindowState.PICTURE_IN_PICTURE -> {
-                Log.d(
-                    TAG,
-                    "YouTube visible (state=$state, playMode=${info.playMode}), showing fullscreen overlay"
-                )
+                Log.d(TAG, "YouTube visible (state=$state), showing fullscreen overlay")
                 OverlayState.Fullscreen
             }
-            WindowState.BACKGROUND -> OverlayState.None
+            WindowState.BACKGROUND -> {
+                Log.d(TAG, "YouTube not visible (state=$state), hiding overlay")
+                OverlayState.None
+            }
         }
     }
 
