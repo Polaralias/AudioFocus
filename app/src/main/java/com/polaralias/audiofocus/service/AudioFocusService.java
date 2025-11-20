@@ -2,11 +2,9 @@ package com.polaralias.audiofocus.service;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.Context;
-import android.content.Intent;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.view.View;
@@ -68,11 +66,6 @@ public class AudioFocusService extends AccessibilityService implements MediaSess
         super.onDestroy();
     }
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-    
     @Override
     public void onActiveSessionsChanged(List<MediaController> controllers) {
         MediaController target = null;
