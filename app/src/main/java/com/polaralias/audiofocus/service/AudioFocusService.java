@@ -69,6 +69,11 @@ public class AudioFocusService extends AccessibilityService implements MediaSess
     }
 
     @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+    
+    @Override
     public void onActiveSessionsChanged(List<MediaController> controllers) {
         MediaController target = null;
         if (controllers != null) {
