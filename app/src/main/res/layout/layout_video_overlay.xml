@@ -22,14 +22,45 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <ImageButton
-            android:id="@+id/overlayPlayPause"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/app_name"
-            android:src="@android:drawable/ic_media_play" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="16dp">
+
+            <ImageButton
+                android:id="@+id/overlayRewind"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Rewind 10s"
+                android:src="@android:drawable/ic_media_rew"
+                android:padding="8dp"
+                android:scaleType="fitCenter"/>
+
+            <ImageButton
+                android:id="@+id/overlayPlayPause"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/app_name"
+                android:src="@android:drawable/ic_media_play"
+                android:padding="8dp"
+                android:scaleType="fitCenter"/>
+
+            <ImageButton
+                android:id="@+id/overlayForward"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Forward 10s"
+                android:src="@android:drawable/ic_media_ff"
+                android:padding="8dp"
+                android:scaleType="fitCenter"/>
+
+        </LinearLayout>
 
         <SeekBar
             android:id="@+id/overlaySeekBar"
