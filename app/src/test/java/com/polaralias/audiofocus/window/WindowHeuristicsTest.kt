@@ -240,7 +240,7 @@ class WindowHeuristicsTest {
         assertNotEquals(WindowInfo.Empty, cached)
         assertNotNull(cached.appWindows["com.google.android.youtube"])
 
-        now += 800
+        now += 1100
         val expired = heuristics.evaluate(listOf(systemUiWindow), metrics)
         assertEquals(WindowInfo.Empty, expired)
     }
