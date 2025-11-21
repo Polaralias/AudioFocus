@@ -47,6 +47,22 @@ public class MediaControllerManager {
         }
     }
 
+    public void seekBy(long delta) {
+        MediaController controller = activeController;
+        if (controller != null && controller.getTransportControls() != null) {
+            PlaybackState state = controller.getPlaybackState();
+            if (state != null) {
+                long newPos = state.getPosition() + delta;
+                if (newPos < 0) newPos = 0;
+
+                long duration = getDuration();
+                if (duration > 0 && newPos > duration) newPos = duration;
+
+                controller.getTransportControls().seekTo(newPos);
+            }
+        }
+    }
+
     public PlaybackState getPlaybackState() {
         MediaController controller = activeController;
         if (controller == null) {

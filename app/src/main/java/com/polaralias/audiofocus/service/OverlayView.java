@@ -27,6 +27,8 @@ public class OverlayView {
     private final View overlayRoot;
     private final TextView titleView;
     private final ImageButton playPauseButton;
+    private final ImageButton rewindButton;
+    private final ImageButton forwardButton;
     private final SeekBar seekBar;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -35,10 +37,22 @@ public class OverlayView {
         public void run() {
             PlaybackState state = controllerManager.getPlaybackState();
             if (state != null) {
-                playbackState = state.getState();
-                lastKnownPosition = state.getPosition();
-                long stateUpdateTime = state.getLastPositionUpdateTime();
-                lastPositionUpdateTime = stateUpdateTime == 0 ? SystemClock.elapsedRealtime() : stateUpdateTime;
+                boolean isPlaying = state.getState() == PlaybackState.STATE_PLAYING;
+                boolean stateChanged = playbackState != state.getState();
+                long stateTime = state.getLastPositionUpdateTime();
+                long currentPos = state.getPosition();
+
+                // Update if:
+                // 1. We have a valid timestamp (source of truth)
+                // 2. OR Position changed (seek or periodic update)
+                // 3. OR Playback state changed
+                // 4. OR We haven't initialized yet (lastPositionUpdateTime == 0)
+                if (stateTime > 0 || currentPos != lastKnownPosition || stateChanged || lastPositionUpdateTime == 0) {
+                     playbackState = state.getState();
+                     lastKnownPosition = currentPos;
+                     lastPositionUpdateTime = (stateTime > 0) ? stateTime : SystemClock.elapsedRealtime();
+                }
+
                 long duration = controllerManager.getDuration();
                 if (duration > 0 && seekBar.getMax() != duration) {
                     seekBar.setMax((int) duration);
@@ -69,6 +83,8 @@ public class OverlayView {
         overlayRoot = LayoutInflater.from(this.context).inflate(R.layout.layout_video_overlay, null);
         titleView = overlayRoot.findViewById(R.id.overlayTitle);
         playPauseButton = overlayRoot.findViewById(R.id.overlayPlayPause);
+        rewindButton = overlayRoot.findViewById(R.id.overlayRewind);
+        forwardButton = overlayRoot.findViewById(R.id.overlayForward);
         seekBar = overlayRoot.findViewById(R.id.overlaySeekBar);
 
         configureControls();
@@ -96,6 +112,9 @@ public class OverlayView {
                 startHeartbeat();
             }
         });
+
+        rewindButton.setOnClickListener(v -> controllerManager.seekBy(-10000));
+        forwardButton.setOnClickListener(v -> controllerManager.seekBy(10000));
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
