@@ -223,7 +223,12 @@ class WindowHeuristics(
     }
 
     private fun resolveEmptyResult(reason: CacheReason): WindowInfo {
-        val shouldUseCache = reason == CacheReason.NO_WINDOWS || reason == CacheReason.TRANSIENT_SYSTEM
+        val lastState = lastVisibleSnapshot.appWindows.values.firstOrNull()?.state
+        val wasPip = lastState == WindowState.PICTURE_IN_PICTURE
+        val shouldUseCache = reason == CacheReason.NO_WINDOWS ||
+            reason == CacheReason.TRANSIENT_SYSTEM ||
+            (wasPip && reason == CacheReason.NO_SUPPORTED_WINDOWS)
+
         if (shouldUseCache) {
             val cached = cachedSnapshotOrNull()
             if (cached != null) {
@@ -567,7 +572,7 @@ class WindowHeuristics(
         private const val FULLSCREEN_COVERAGE_THRESHOLD = 0.75f
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
         private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
-        private const val CACHE_TIMEOUT_MS = 750L
+        private const val CACHE_TIMEOUT_MS = 1000L
 
         private const val MAX_SELECTION_PARENT_DEPTH = 5
 
