@@ -19,18 +19,15 @@ object PolicyEngine {
 
         val prefs = input.preferences
         val playbackActivity = playbackActivity(input.playbackState)
-        if (playbackActivity != PlaybackActivity.PLAYING) {
-            Log.d(TAG, "Playback not in PLAYING state for $pkg (activity=$playbackActivity)")
-            return OverlayState.None
-        }
-
         val windowInfo = input.windowInfo.infoFor(pkg)
+
         return when (pkg) {
-            YOUTUBE -> evaluateYouTube(prefs.enableYouTube, windowInfo)
+            YOUTUBE -> evaluateYouTube(prefs.enableYouTube, windowInfo, playbackActivity)
             YOUTUBE_MUSIC -> evaluateYouTubeMusic(
                 enabled = prefs.enableYouTubeMusic,
                 windowInfo = windowInfo,
                 metadata = input.metadata,
+                playbackActivity = playbackActivity,
             )
             else -> {
                 Log.d(TAG, "Package not supported for overlays: $pkg")
@@ -42,6 +39,7 @@ object PolicyEngine {
     private fun evaluateYouTube(
         enabled: Boolean,
         windowInfo: AppWindowInfo?,
+        playbackActivity: PlaybackActivity,
     ): OverlayState {
         if (!enabled) {
             Log.d(TAG, "YouTube overlay disabled in preferences")
@@ -51,6 +49,20 @@ object PolicyEngine {
         val info = windowInfo ?: run {
             Log.d(TAG, "YouTube window not visible, hiding overlay")
             return OverlayState.None
+        }
+
+        // Shorts detection: if heuristics identify Shorts, we show overlay even if
+        // playback state is ambiguous (as Shorts often don't report standard states reliably).
+        // Otherwise, we require strict PLAYING state.
+        val isShorts = info.playMode == PlayMode.SHORTS
+        if (isShorts) {
+            if (playbackActivity == PlaybackActivity.PAUSED) {
+                return OverlayState.None
+            }
+        } else {
+            if (playbackActivity != PlaybackActivity.PLAYING) {
+                return OverlayState.None
+            }
         }
 
         val state = info.state
@@ -72,9 +84,14 @@ object PolicyEngine {
         enabled: Boolean,
         windowInfo: AppWindowInfo?,
         metadata: MediaMetadata?,
+        playbackActivity: PlaybackActivity,
     ): OverlayState {
         if (!enabled) {
             Log.d(TAG, "YouTube Music overlay disabled in preferences")
+            return OverlayState.None
+        }
+
+        if (playbackActivity != PlaybackActivity.PLAYING) {
             return OverlayState.None
         }
 
@@ -99,6 +116,12 @@ object PolicyEngine {
         }
 
         val selectedMode = info.selectedMode
+        // If user explicitly selected Audio mode, we respect that regardless of surface heuristics
+        if (selectedMode == PlayMode.AUDIO) {
+            Log.d(TAG, "YouTube Music explicitly in Song mode, hiding overlay")
+            return OverlayState.None
+        }
+
         val videoSurfaceFraction = info.videoSurfaceFraction
         val isVideo = videoSurfaceFraction >= VIDEO_SURFACE_THRESHOLD || selectedMode == PlayMode.VIDEO
 
