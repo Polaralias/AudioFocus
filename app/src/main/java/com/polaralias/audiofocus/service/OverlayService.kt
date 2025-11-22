@@ -66,11 +66,13 @@ internal const val ACTION_SEEK_BACKWARD: Long = 0x400000L // 4194304L
 private object PlaybackStateExtras {
     private const val EXTRA_DURATION_COMPAT = "android.media.playbackstate.extra.DURATION"
     private const val EXTRA_DURATION_STANDARD = "android.media.extra.DURATION"
+    private const val EXTRA_DURATION_METADATA = "android.media.metadata.DURATION"
 
     fun durationFrom(extras: Bundle?): Long? {
         if (extras == null) return null
         return extras.getLong(EXTRA_DURATION_STANDARD, -1L).takeIf { it > 0L }
             ?: extras.getLong(EXTRA_DURATION_COMPAT, -1L).takeIf { it > 0L }
+            ?: extras.getLong(EXTRA_DURATION_METADATA, -1L).takeIf { it > 0L }
     }
 }
 
@@ -86,7 +88,7 @@ class OverlayService : LifecycleService() {
 
         // Grace period: Once overlay is visible, tolerate brief "hide" signals for this duration
         // This prevents overlay from disappearing during momentary detection mismatches
-        private const val GRACE_PERIOD_MS = 500L
+        private const val GRACE_PERIOD_MS = 1000L
 
         private const val PERMISSION_RETRY_DELAY_MS = 1000L
         private const val PERMISSION_MAX_ATTEMPTS = 3
@@ -578,10 +580,12 @@ class OverlayService : LifecycleService() {
         val previous = previousDuration.takeIf { it > 0L }
         val positionFallback = currentPosition.takeIf { it > 0L }
 
+        // If we have a valid position but no duration, assume duration is at least position
+        // This ensures hasProgress becomes true and enables the slider (even if it's just a progress indicator)
         return metadataDuration
             ?: extrasDuration
             ?: previous
-            ?: positionFallback
+            ?: positionFallback // Actually use the fallback!
             ?: 0L
     }
 

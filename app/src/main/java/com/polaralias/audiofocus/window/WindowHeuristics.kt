@@ -616,9 +616,9 @@ class WindowHeuristics(
             SurfaceHint(viewIdSubstrings = listOf("pip"), allowHidden = true),
         )
 
-        private val SHORTS_KEYWORDS = listOf("shorts", "reel", "reels", "shortform", "clip")
-        private val SHORTS_CLASS_HINTS = listOf("shorts", "shortvideo")
-        private val SHORTS_CONTAINER_CLASSES = listOf("viewpager", "recyclerview")
+        private val SHORTS_KEYWORDS = listOf("shorts", "reel", "reels", "shortform", "clip", "shorts_player", "reel_player")
+        private val SHORTS_CLASS_HINTS = listOf("shorts", "shortvideo", "reel")
+        private val SHORTS_CONTAINER_CLASSES = listOf("viewpager", "recyclerview", "framelayout")
 
         private val YTM_VIDEO_KEYWORDS = listOf("video", "videos")
         private val YTM_AUDIO_KEYWORDS = listOf("song", "songs", "audio")

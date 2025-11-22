@@ -113,6 +113,12 @@ object PolicyEngine {
                 "YouTube Music metadata indicates video (state=$windowState, metadata=$videoMetadata)"
             )
             return OverlayState.Fullscreen
+        } else if (videoMetadata != null && !videoMetadata.indicatesVideo) {
+            Log.d(
+                TAG,
+                "YouTube Music metadata indicates audio-only (metadata=$videoMetadata), hiding overlay"
+            )
+            return OverlayState.None
         }
 
         val selectedMode = info.selectedMode
