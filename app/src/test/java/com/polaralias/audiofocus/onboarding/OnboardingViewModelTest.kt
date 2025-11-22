@@ -41,9 +41,8 @@ class OnboardingViewModelTest {
     fun `initial state checks permissions and starts at overlay step when not granted`() = runTest {
         viewModel = OnboardingViewModel(application)
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         val state = viewModel.uiState.value
-        // ViewModel checks permissions in init, so it starts at OVERLAY when no permissions granted
         assertEquals(OnboardingStep.OVERLAY, state.currentStep)
         assertFalse(state.hasOverlayPermission)
         assertFalse(state.hasNotificationAccess)
@@ -94,15 +93,12 @@ class OnboardingViewModelTest {
 
     @Test
     fun `checkPermissionsAndUpdateStep moves to notification step when overlay granted`() = runTest {
-        // This test would require mocking the permission checks
-        // For now, we verify the method doesn't crash
         viewModel = OnboardingViewModel(application)
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         viewModel.checkPermissionsAndUpdateStep()
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        // Since permissions are not granted in test, should still be at OVERLAY
+
         val state = viewModel.uiState.value
         assertEquals(OnboardingStep.OVERLAY, state.currentStep)
     }

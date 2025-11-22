@@ -64,9 +64,8 @@ class OnboardingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.i(TAG, "OnboardingActivity onCreate - starting initialization")
-        
+
         try {
-            // Check if we should skip onboarding
             checkIfShouldSkipOnboarding()
             
             setContent {
@@ -85,7 +84,6 @@ class OnboardingActivity : ComponentActivity() {
                                 Log.d(TAG, "OnboardingActivity finished")
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error navigating to SettingsActivity", e)
-                                // Don't crash - log the error and let user retry
                             }
                         }
                     }
@@ -135,7 +133,6 @@ class OnboardingActivity : ComponentActivity() {
             Log.d(TAG, "OnboardingActivity content set successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during OnboardingActivity onCreate", e)
-            // Don't crash - the Compose content should still render with default state
         }
     }
 
@@ -154,7 +151,6 @@ class OnboardingActivity : ComponentActivity() {
                         Log.d(TAG, "OnboardingActivity finished after skip")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error navigating to SettingsActivity during skip", e)
-                        // Don't crash - log error and let user go through onboarding flow
                     }
                 } else {
                     Log.d(TAG, "Not skipping onboarding - user will go through flow")
@@ -162,7 +158,6 @@ class OnboardingActivity : ComponentActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during skip check initiation", e)
-            // Continue with normal onboarding flow on error
         }
     }
 

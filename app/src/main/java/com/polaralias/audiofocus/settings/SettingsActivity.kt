@@ -93,12 +93,10 @@ class SettingsActivity : ComponentActivity() {
         try {
             setContent {
                 AudioFocusTheme {
-                    // Wrap entire screen in Surface with Material3 colors to ensure proper contrast
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        // Force LocalContentColor to ensure all text uses proper contrast
                         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                             val state by viewModel.uiState.collectAsState()
                             val activity = this@SettingsActivity
@@ -138,7 +136,6 @@ class SettingsActivity : ComponentActivity() {
                                             Log.d(TAG, "OverlayService start command sent successfully")
                                         } catch (e: Exception) {
                                             Log.e(TAG, "Error starting OverlayService", e)
-                                            // Don't crash - service may recover or user can retry
                                         }
                                     } else if (ready && !listenerConnected) {
                                         Log.i(
@@ -153,7 +150,6 @@ class SettingsActivity : ComponentActivity() {
                                             Log.d(TAG, "OverlayService stop command sent successfully")
                                         } catch (e: Exception) {
                                             Log.e(TAG, "Error stopping OverlayService", e)
-                                            // Don't crash - service may already be stopped
                                         }
                                     } else if (!ready) {
                                         Log.w(TAG, "Cannot start service - missing permissions: ${state.permissionDiagnostic}")
@@ -161,7 +157,6 @@ class SettingsActivity : ComponentActivity() {
                                     }
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Error in LaunchedEffect permission handling", e)
-                                    // Don't crash - keep UI responsive
                                 }
                             }
                             
@@ -193,7 +188,6 @@ class SettingsActivity : ComponentActivity() {
             Log.d(TAG, "SettingsActivity content set successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during SettingsActivity onCreate", e)
-            // Don't crash - Compose will render with default state
         }
     }
 

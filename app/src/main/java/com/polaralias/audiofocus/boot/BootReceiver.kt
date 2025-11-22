@@ -41,7 +41,6 @@ class BootReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // Perform strict sequential permission checks with retry to allow propagation
                 var attempt = 1
                 var permissionStatus = PermissionValidator.checkPermissions(context.applicationContext, TAG)
                 while (!permissionStatus.allPermissionsGranted && attempt < PERMISSION_MAX_ATTEMPTS) {

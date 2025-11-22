@@ -14,5 +14,5 @@ data class SettingsUiState(
     val notificationListenerConnected: Boolean = false,
     val serviceDiagnostic: String = "",
     val overlayServiceStatus: OverlayServiceStatus = OverlayServiceStatus(OverlayServiceState.STOPPED),
-    val isLoading: Boolean = true // Indicates whether initial data is still being loaded
+    val isLoading: Boolean = true
 )

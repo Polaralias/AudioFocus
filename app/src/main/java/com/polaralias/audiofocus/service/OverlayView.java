@@ -16,9 +16,6 @@ import android.widget.TextView;
 
 import com.polaralias.audiofocus.R;
 
-/**
- * Renders and manages the full-screen overlay that mirrors media playback controls.
- */
 public class OverlayView {
     private final Context context;
     private final MediaControllerManager controllerManager;
@@ -42,11 +39,6 @@ public class OverlayView {
                 long stateTime = state.getLastPositionUpdateTime();
                 long currentPos = state.getPosition();
 
-                // Update if:
-                // 1. We have a valid timestamp (source of truth)
-                // 2. OR Position changed (seek or periodic update)
-                // 3. OR Playback state changed
-                // 4. OR We haven't initialized yet (lastPositionUpdateTime == 0)
                 if (stateTime > 0 || currentPos != lastKnownPosition || stateChanged || lastPositionUpdateTime == 0) {
                      playbackState = state.getState();
                      lastKnownPosition = currentPos;
@@ -119,12 +111,10 @@ public class OverlayView {
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                // Intentionally empty; seeking occurs after the drag is finished.
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                // No-op
             }
 
             @Override

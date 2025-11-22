@@ -45,10 +45,8 @@ class OverlayAnimatorTest {
         view.visibility = View.GONE
         view.alpha = 0.5f
 
-        // Start an animation (this would normally take 200ms)
         view.animate().alpha(1f).setDuration(200)
 
-        // Immediately show - should cancel animation
         OverlayAnimator.showImmediate(view)
 
         assertEquals("View should be visible", View.VISIBLE, view.visibility)
@@ -62,10 +60,8 @@ class OverlayAnimatorTest {
         view.visibility = View.VISIBLE
         view.alpha = 0.5f
 
-        // Start an animation (this would normally take 200ms)
         view.animate().alpha(0f).setDuration(200)
 
-        // Immediately hide - should cancel animation
         OverlayAnimator.hideImmediate(view)
 
         assertEquals("View should be gone", View.GONE, view.visibility)
@@ -77,14 +73,12 @@ class OverlayAnimatorTest {
         val context = RuntimeEnvironment.getApplication()
         val view = View(context)
 
-        // Test from GONE state
         view.visibility = View.GONE
         view.alpha = 0f
         OverlayAnimator.showImmediate(view)
         assertEquals(View.VISIBLE, view.visibility)
         assertEquals(1f, view.alpha, 0.01f)
 
-        // Test from INVISIBLE state
         view.visibility = View.INVISIBLE
         view.alpha = 0.5f
         OverlayAnimator.showImmediate(view)
@@ -97,14 +91,12 @@ class OverlayAnimatorTest {
         val context = RuntimeEnvironment.getApplication()
         val view = View(context)
 
-        // Test from VISIBLE state
         view.visibility = View.VISIBLE
         view.alpha = 1f
         OverlayAnimator.hideImmediate(view)
         assertEquals(View.GONE, view.visibility)
         assertEquals(0f, view.alpha, 0.01f)
 
-        // Test from partially visible state
         view.visibility = View.VISIBLE
         view.alpha = 0.5f
         OverlayAnimator.hideImmediate(view)

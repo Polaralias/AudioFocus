@@ -51,9 +51,6 @@ object PolicyEngine {
             return OverlayState.None
         }
 
-        // Shorts detection: if heuristics identify Shorts, we show overlay even if
-        // playback state is ambiguous (as Shorts often don't report standard states reliably).
-        // Otherwise, we require strict PLAYING state.
         val isShorts = info.playMode == PlayMode.SHORTS
         if (isShorts) {
             if (playbackActivity == PlaybackActivity.PAUSED) {
@@ -122,7 +119,6 @@ object PolicyEngine {
         }
 
         val selectedMode = info.selectedMode
-        // If user explicitly selected Audio mode, we respect that regardless of surface heuristics
         if (selectedMode == PlayMode.AUDIO) {
             Log.d(TAG, "YouTube Music explicitly in Song mode, hiding overlay")
             return OverlayState.None

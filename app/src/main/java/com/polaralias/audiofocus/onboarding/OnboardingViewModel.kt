@@ -32,16 +32,10 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /**
-     * Check if onboarding should be skipped asynchronously.
-     * Returns a StateFlow that emits the skip decision.
-     * This prevents blocking the UI thread during the check.
-     */
     fun checkIfShouldSkipOnboarding(callback: (Boolean) -> Unit) {
         Log.d(TAG, "Checking if should skip onboarding - async operation started")
         viewModelScope.launch {
             try {
-                // Defensive: Run all checks in background to avoid blocking
                 val isCompleted = repository.isOnboardingCompleted()
                 Log.d(TAG, "Onboarding completed status: $isCompleted")
                 
@@ -55,7 +49,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 callback(shouldSkip)
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking if should skip onboarding", e)
-                // On error, don't skip onboarding to be safe - user can still proceed through flow
                 Log.w(TAG, "Defaulting to NOT skipping onboarding due to error")
                 callback(false)
             }
@@ -99,7 +92,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 Log.d(TAG, "UI state updated successfully with step: $currentStep")
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking permissions and updating step", e)
-                // Update UI to show error but keep it responsive
                 _uiState.update { it.copy(showError = true) }
             }
         }
@@ -140,14 +132,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 Log.d(TAG, "Setting onboarding completed flag in DataStore...")
                 repository.setOnboardingCompleted(true)
                 Log.i(TAG, "Onboarding completed flag set successfully")
-                
-                // Update UI state to trigger navigation
+
                 _uiState.update { it.copy(isOnboardingComplete = true) }
                 Log.d(TAG, "UI state updated - isOnboardingComplete=true")
             } catch (e: Exception) {
                 Log.e(TAG, "Error completing onboarding in DataStore", e)
-                // Still mark as complete in UI to allow user to proceed
-                // On next app start, we'll check permissions again to determine skip status
                 Log.w(TAG, "Proceeding with navigation despite DataStore error")
                 _uiState.update { it.copy(isOnboardingComplete = true) }
             }

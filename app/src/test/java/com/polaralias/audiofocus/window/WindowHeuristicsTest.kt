@@ -20,7 +20,7 @@ import org.mockito.kotlin.whenever
 import org.mockito.kotlin.doAnswer
 import org.robolectric.RobolectricTestRunner
 
-private const val TYPE_PINNED = 4 // Matches WindowHeuristics.determineWindowState PiP type check
+private const val TYPE_PINNED = 4
 
 @RunWith(RobolectricTestRunner::class)
 class WindowHeuristicsTest {

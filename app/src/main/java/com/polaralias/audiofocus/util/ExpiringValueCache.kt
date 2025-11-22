@@ -3,11 +3,6 @@ package com.polaralias.audiofocus.util
 import android.os.SystemClock
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Lightweight cache for values that should expire after [ttlMillis].
- * Primarily used to avoid recomputing expensive heuristics when signal updates
- * arrive in quick succession.
- */
 class ExpiringValueCache<K : Any, V : Any>(
     private val ttlMillis: Long,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },

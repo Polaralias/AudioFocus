@@ -4,9 +4,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Lightweight status publisher so the UI can reflect what the overlay service is doing.
- */
 object OverlayServiceStatusTracker {
     private val _status = MutableStateFlow(
         OverlayServiceStatus(state = OverlayServiceState.STOPPED)

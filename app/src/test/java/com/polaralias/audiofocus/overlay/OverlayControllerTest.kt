@@ -63,7 +63,6 @@ class OverlayControllerTest {
         controller.update(state1)
         controller.update(state2)
 
-        // Both states result in FULL_SCREEN_OVERLAY, so applier should be called only once
         verify(mockApplier, times(1)).showFullScreenOverlay()
         verifyNoMoreInteractions(mockApplier)
     }

@@ -51,8 +51,6 @@ class PolicyEngineTest {
 
     @Test
     fun youtubePlayingWithoutVisibleSurfaceShowsOverlay() {
-        // This simulates the "highly unreliable" case where heuristic detection of SurfaceView fails
-        // but the app is clearly in the foreground and playing.
         val input = PolicyInput(
             packageName = "com.google.android.youtube",
             playbackState = playingState,
@@ -61,7 +59,7 @@ class PolicyEngineTest {
                 pkg = "com.google.android.youtube",
                 state = WindowState.FULLSCREEN,
                 videoSurfaceFraction = 0f,
-                playMode = PlayMode.AUDIO, // Default when surface not found
+                playMode = PlayMode.AUDIO,
             ),
             preferences = prefs
         )

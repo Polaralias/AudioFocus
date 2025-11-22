@@ -59,9 +59,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// These constants are not present in earlier Android SDKs. Add them if missing:
-internal const val ACTION_SEEK_FORWARD: Long = 0x200000L // 2097152L
-internal const val ACTION_SEEK_BACKWARD: Long = 0x400000L // 4194304L
+internal const val ACTION_SEEK_FORWARD: Long = 0x200000L
+internal const val ACTION_SEEK_BACKWARD: Long = 0x400000L
 
 private object PlaybackStateExtras {
     private const val EXTRA_DURATION_COMPAT = "android.media.playbackstate.extra.DURATION"
@@ -82,12 +81,8 @@ class OverlayService : LifecycleService() {
         private const val ACTION_TOGGLE_PLAYBACK = "com.polaralias.audiofocus.action.TOGGLE_PLAYBACK"
         private const val ACTION_STOP = "com.polaralias.audiofocus.action.STOP"
 
-        // Debounce period: Wait this long before applying state changes to prevent flicker
-        // on rapid state transitions (e.g., transient window state changes during animations)
         private const val DEBOUNCE_DELAY_MS = 300L
 
-        // Grace period: Once overlay is visible, tolerate brief "hide" signals for this duration
-        // This prevents overlay from disappearing during momentary detection mismatches
         private const val GRACE_PERIOD_MS = 1000L
 
         private const val PERMISSION_RETRY_DELAY_MS = 1000L
@@ -137,8 +132,6 @@ class OverlayService : LifecycleService() {
     private var hideAnimationJob: Job? = null
     private val positionEstimator = PlaybackPositionEstimator()
 
-    // Debounce mechanism: Track pending overlay state changes to prevent flickering
-    // Grace period allows tolerating brief mismatches in detection without hiding overlay
     private var pendingOverlayState: OverlayState? = null
     private var debounceJob: Job? = null
     private var lastVisibleState: OverlayState = OverlayState.None
@@ -152,7 +145,6 @@ class OverlayService : LifecycleService() {
         Log.i(TAG, "OverlayService onCreate - starting initialization")
 
         try {
-            // Validate permissions before initializing
             Log.d(TAG, "Checking permissions before service initialization")
             val permissionStatus = verifyPermissionsWithRetry()
             if (!permissionStatus.allPermissionsGranted) {
@@ -176,10 +168,7 @@ class OverlayService : LifecycleService() {
             startForeground(OverlayNotification.NOTIFICATION_ID, notification)
             isForeground = true
             Log.i(TAG, "Service started in foreground successfully")
-            
-            // NEW BEHAVIOR: Attach overlay views immediately when service starts
-            // This keeps views present (like AudioFocus_old), we'll control visibility via alpha/visibility
-            // Views stay attached as long as overlay permission is granted and service is running
+
             Log.d(TAG, "Attaching overlay views to WindowManager")
             attachOverlayViews()
 
@@ -397,38 +386,18 @@ class OverlayService : LifecycleService() {
             MediaState.Idle -> OverlayServiceStatusTracker.update(OverlayServiceState.WAITING_FOR_MEDIA)
         }
 
-        // NEW BEHAVIOR: Use debouncing and grace period to prevent flicker
-        // Instead of immediately showing/hiding overlay, we schedule the change with a delay
-        // This allows us to ignore transient state changes and rapid transitions
         applyOverlayStateWithDebounce(renderState.overlayState, renderState.mediaState is MediaState.Playing)
     }
-    
-    /**
-     * Apply overlay state with debounce and grace period logic.
-     * 
-     * DEBOUNCE: Wait DEBOUNCE_DELAY_MS before applying state changes. If multiple state changes
-     * arrive within this window, only the last one is applied. This prevents flickering during
-     * rapid transitions (e.g., during app UI animations or window state changes).
-     * 
-     * GRACE PERIOD: Once overlay is visible, we tolerate "hide" commands for GRACE_PERIOD_MS
-     * before actually hiding. This prevents momentary detection mismatches from causing the
-     * overlay to disappear. If a "show" command arrives during grace period, we cancel the hide.
-     * 
-     * This approach keeps overlay views attached (like old app) but controls visibility in-place.
-     */
+
     private fun applyOverlayStateWithDebounce(newState: OverlayState, isPlaying: Boolean) {
-        // Cancel any pending debounce job
         debounceJob?.cancel()
-        
-        // Store the pending state
+
         pendingOverlayState = newState
-        
-        // If requesting to hide but we recently showed overlay, apply grace period
+
         if (newState is OverlayState.None && lastVisibleState !is OverlayState.None) {
             val timeSinceVisible = System.currentTimeMillis() - lastVisibleTimestamp
             if (timeSinceVisible < GRACE_PERIOD_MS) {
                 Log.d(TAG, "Grace period active (${timeSinceVisible}ms < ${GRACE_PERIOD_MS}ms), delaying hide")
-                // Schedule hide after remaining grace period
                 val remainingGrace = GRACE_PERIOD_MS - timeSinceVisible
                 debounceJob = scope.launch {
                     delay(remainingGrace)
@@ -437,21 +406,13 @@ class OverlayService : LifecycleService() {
                 return
             }
         }
-        
-        // Apply state change after debounce delay
+
         debounceJob = scope.launch {
             delay(DEBOUNCE_DELAY_MS)
             applyOverlayStateImmediate(newState, isPlaying)
         }
     }
-    
-    /**
-     * Immediately apply overlay state by updating view visibility.
-     * 
-     * NEW BEHAVIOR: Views remain attached to WindowManager. We control visibility using
-     * View.VISIBLE and View.GONE (or alpha for smooth transitions). This prevents the
-     * add/remove overhead and potential flickering from repeated WindowManager operations.
-     */
+
     private fun applyOverlayStateImmediate(state: OverlayState, isPlaying: Boolean) {
         Log.d(TAG, "Applying overlay state: $state (isPlaying=$isPlaying)")
         
@@ -462,17 +423,15 @@ class OverlayService : LifecycleService() {
             else -> {
                 setOverlayVisibility(visible = true, isPlaying)
 
-                // Track when overlay became visible for grace period
                 if (lastVisibleState is OverlayState.None) {
                     lastVisibleTimestamp = System.currentTimeMillis()
                 }
                 lastVisibleState = state
             }
         }
-        
+
         currentOverlay = state
-        
-        // Update notification
+
         val notification = buildNotification(isPlaying)
         startForeground(OverlayNotification.NOTIFICATION_ID, notification)
         if (!isForeground) {
@@ -580,12 +539,10 @@ class OverlayService : LifecycleService() {
         val previous = previousDuration.takeIf { it > 0L }
         val positionFallback = currentPosition.takeIf { it > 0L }
 
-        // If we have a valid position but no duration, assume duration is at least position
-        // This ensures hasProgress becomes true and enables the slider (even if it's just a progress indicator)
         return metadataDuration
             ?: extrasDuration
             ?: previous
-            ?: positionFallback // Actually use the fallback!
+            ?: positionFallback
             ?: 0L
     }
 
@@ -602,28 +559,20 @@ class OverlayService : LifecycleService() {
         }
     }
 
-    /**
-     * Attach overlay views to WindowManager early (onCreate).
-     * NEW BEHAVIOR: Views are attached once and kept attached (like AudioFocus_old).
-     * We control visibility in-place rather than repeatedly adding/removing views.
-     * This provides better startup reliability and prevents flickering.
-     */
     private fun attachOverlayViews() {
         try {
             Log.i(TAG, "Attaching overlay views to WindowManager")
-            
-            // Create and attach mask view (initially hidden)
+
             val maskFrame = OverlayMaskContainer(this).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                visibility = View.GONE // Start hidden
+                visibility = View.GONE
                 alpha = 0f
                 applyPreferences(scope, latestPreferences)
             }
-            
-            // Use a pass-through layout initially so touches are not blocked until the policy enables the mask
+
             try {
                 Log.d(TAG, "Creating mask layout parameters")
                 val maskParams = OverlayLayoutFactory.maskLayoutFor(this, OverlayState.None)
@@ -635,18 +584,14 @@ class OverlayService : LifecycleService() {
                 Log.e(TAG, "Error attaching mask view to WindowManager", e)
             }
             
-            // Create and attach controls view (initially hidden)
             try {
                 Log.d(TAG, "Creating controls ComposeView")
                 val savedStateOwner = OverlaySavedStateOwner(this)
                 val composeView = ComposeView(this).apply {
-                    // Compose requires both a LifecycleOwner and a SavedStateRegistryOwner in the
-                    // ViewTree when observing flows or using rememberSaveable. Services do not
-                    // provide these automatically, so we wire them manually.
                     setViewTreeLifecycleOwner(this@OverlayService)
                     setViewTreeSavedStateRegistryOwner(savedStateOwner)
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                    visibility = View.GONE // Start hidden
+                    visibility = View.GONE
                     alpha = 0f
                     setContent {
                         AudioFocusTheme {
@@ -675,16 +620,11 @@ class OverlayService : LifecycleService() {
             Log.i(TAG, "Overlay views attachment completed - maskView=${maskView != null}, controlsView=${controlsView != null}")
         } catch (e: Exception) {
             Log.e(TAG, "Fatal error attaching overlay views", e)
-            // Clean up on failure
             maskView = null
             controlsView = null
         }
     }
-    
-    /**
-     * Update mask view layout parameters and appearance for the given overlay state.
-     * This updates the existing attached view rather than recreating it.
-     */
+
     private fun updateMaskForState(state: OverlayState) {
         val mask = maskView ?: run {
             Log.w(TAG, "Mask view not attached, cannot update")
@@ -694,7 +634,6 @@ class OverlayService : LifecycleService() {
         try {
             Log.d(TAG, "Updating mask for state: $state")
 
-            // Update layout parameters if state changed
             try {
                 val params = OverlayLayoutFactory.maskLayoutFor(this, state)
                 windowManager.updateViewLayout(mask, params)
@@ -709,18 +648,11 @@ class OverlayService : LifecycleService() {
         }
     }
     
-    /**
-     * Control overlay visibility by setting View.VISIBLE or View.GONE and animating alpha.
-     * NEW BEHAVIOR: Views stay attached, we just change visibility/alpha in-place.
-     * This prevents the overhead of repeated WindowManager add/remove calls.
-     */
     private fun setOverlayVisibility(visible: Boolean, isPlaying: Boolean) {
         Log.i(TAG, "Setting overlay visibility: visible=$visible, isPlaying=$isPlaying")
-        
+
         try {
             if (visible) {
-                // Make views visible with fade-in animation
-                // Note: OverlayAnimator.fadeIn handles setting visibility internally
                 maskView?.let { view ->
                     if (view.visibility != View.VISIBLE || view.alpha < 1f) {
                         scope.launch {
@@ -734,7 +666,7 @@ class OverlayService : LifecycleService() {
                         }
                     }
                 }
-                
+
                 controlsView?.let { view ->
                     if (view.visibility != View.VISIBLE || view.alpha < 1f) {
                         scope.launch {
@@ -749,8 +681,6 @@ class OverlayService : LifecycleService() {
                     }
                 }
             } else {
-                // Hide views with fade-out animation, then set GONE
-                // Note: OverlayAnimator.fadeOut handles setting visibility to GONE internally
                 hideAnimationJob?.cancel()
                 hideAnimationJob = scope.launch {
                     try {
@@ -759,9 +689,8 @@ class OverlayService : LifecycleService() {
                         
                         if (mask != null || controls != null) {
                             Log.d(TAG, "Starting fade-out animation for overlay views")
-                            // Fade out both views in parallel
                             val maskJob = async {
-                                mask?.let { 
+                                mask?.let {
                                     Log.d(TAG, "Fading out mask view")
                                     OverlayAnimator.fadeOut(it) 
                                 }
@@ -777,11 +706,9 @@ class OverlayService : LifecycleService() {
                             Log.d(TAG, "Fade-out animation completed")
                         }
                         
-                        // Track that overlay is no longer visible
                         lastVisibleState = OverlayState.None
                     } catch (e: Exception) {
                         Log.e(TAG, "Error during hide animation", e)
-                        // Fall back to immediate hide on error
                         try {
                             maskView?.let { OverlayAnimator.hideImmediate(it) }
                             controlsView?.let { OverlayAnimator.hideImmediate(it) }
@@ -808,7 +735,6 @@ class OverlayService : LifecycleService() {
             Log.d(TAG, "Service stop completed")
         } catch (e: Exception) {
             Log.e(TAG, "Error during service stop", e)
-            // Still try to stop self even on error
             try {
                 OverlayServiceStatusTracker.update(OverlayServiceState.ERROR, e.message)
                 stopSelf()
@@ -821,7 +747,6 @@ class OverlayService : LifecycleService() {
     private fun releaseOverlayResources() {
         Log.i(TAG, "Releasing overlay resources")
         try {
-            // Cancel any ongoing animations and debounce jobs
             Log.d(TAG, "Cancelling pending jobs")
             try {
                 hideAnimationJob?.cancel()
@@ -836,8 +761,7 @@ class OverlayService : LifecycleService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error cancelling debounce job", e)
             }
-            
-            // Remove overlay views from WindowManager
+
             Log.d(TAG, "Removing overlay views")
             removeOverlays()
             
@@ -878,7 +802,6 @@ class OverlayService : LifecycleService() {
                 it.clearImage()
                 runCatching {
                     Log.d(TAG, "Removing mask view from WindowManager")
-                    // Ensure animations are cancelled before removal
                     OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it)
                     Log.i(TAG, "Mask view removed successfully")
@@ -895,7 +818,6 @@ class OverlayService : LifecycleService() {
                 }
                 runCatching {
                     Log.d(TAG, "Removing controls view from WindowManager")
-                    // Ensure animations are cancelled before removal
                     OverlayAnimator.hideImmediate(it)
                     windowManager.removeViewImmediate(it)
                     Log.i(TAG, "Controls view removed successfully")
@@ -932,10 +854,6 @@ class OverlayService : LifecycleService() {
             get() = controller.savedStateRegistry
 
         fun clear() {
-            // Note: performDetach() is only available in savedstate 1.3.0+
-            // For 1.2.1, we don't need to explicitly detach as the controller
-            // will be garbage collected along with the owner
-            // controller.performDetach()
         }
     }
 

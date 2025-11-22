@@ -163,8 +163,6 @@ class AudioFocusNotificationListener : NotificationListenerService() {
     ): PlaybackContentType {
         return when (app) {
             SupportedApp.YOUTUBE -> {
-                // For YouTube: treat all playing content as video
-                // YouTube app doesn't provide reliable metadata for content type
                 val contentType = if (activity == PlaybackActivity.PLAYING) {
                     PlaybackContentType.VIDEO
                 } else {
