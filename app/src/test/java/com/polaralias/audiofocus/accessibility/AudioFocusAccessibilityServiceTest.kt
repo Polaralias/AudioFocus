@@ -51,13 +51,11 @@ class AudioFocusAccessibilityServiceTest {
         setRepository(service, repository)
 
         val event = AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOWS_CHANGED).apply {
-            // Set windowChanges via reflection since there's no setter in the API
             try {
                 val field = AccessibilityEvent::class.java.getDeclaredField("mWindowChanges")
                 field.isAccessible = true
                 field.setInt(this, AccessibilityEvent.WINDOWS_CHANGE_PIP)
             } catch (e: Exception) {
-                // Ignore if field doesn't exist (different Android versions)
             }
         }
 
@@ -88,7 +86,6 @@ class AudioFocusAccessibilityServiceTest {
         root.setBoundsInScreen(Rect(0, 0, 300, 300))
         TestShadowAccessibilityWindowInfo.setRoot(window, root)
         TestShadowAccessibilityWindowInfo.setBounds(window, Rect(0, 0, 200, 200))
-        // Use constant value 4 for TYPE_PICTURE_IN_PICTURE (API 26+) since it may not be in SDK stubs
         TestShadowAccessibilityWindowInfo.setType(window, 4)
         return window
     }

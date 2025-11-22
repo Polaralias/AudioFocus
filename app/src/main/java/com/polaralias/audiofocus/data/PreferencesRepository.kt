@@ -41,7 +41,6 @@ class PreferencesRepository(private val context: Context) {
 
     val preferencesFlow: Flow<OverlayPreferences> = context.dataStore.data
         .catch { e ->
-            // Handle IO errors gracefully by emitting default preferences
             if (e is IOException) {
                 Log.e(TAG, "Error reading preferences, using defaults", e)
                 emit(androidx.datastore.preferences.core.emptyPreferences())

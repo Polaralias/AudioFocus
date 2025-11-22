@@ -146,7 +146,6 @@ class OverlayManagerTest {
 
     @Test
     fun `youtube music audio only playback never shows overlay`() {
-        // YouTube Music audio-only should never show overlay regardless of window state
         WindowState.values().forEach { windowState ->
             val command = manager.evaluate(
                 windowSnapshot = WindowSnapshot(SupportedApp.YOUTUBE_MUSIC, windowState),
@@ -168,23 +167,15 @@ class OverlayManagerTest {
 
     @Test
     fun `all edge case combinations hide overlay correctly`() {
-        // Test combinations of edge cases
         val edgeCases = listOf(
-            // Manual pause with everything else valid
             Triple(true, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), youtubeVideoPlayback),
-            // Null window
             Triple(false, null, youtubeVideoPlayback),
-            // Null playback
             Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), null),
-            // App mismatch
             Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), youtubeMusicVideoPlayback),
-            // Paused state
-            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), 
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN),
                 youtubeVideoPlayback.copy(activity = PlaybackActivity.PAUSED)),
-            // Unknown content type
-            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN), 
+            Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.FULLSCREEN),
                 youtubeVideoPlayback.copy(contentType = PlaybackContentType.UNKNOWN)),
-            // Unknown window state
             Triple(false, WindowSnapshot(SupportedApp.YOUTUBE, WindowState.UNKNOWN), youtubeVideoPlayback),
         )
 

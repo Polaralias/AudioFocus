@@ -32,15 +32,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     init {
         Log.i(TAG, "SettingsViewModel initialized - starting async data loading")
         
-        // Asynchronously collect preferences without blocking
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Starting preferences collection from DataStore")
                 repository.preferencesFlow
                     .catch { e ->
                         Log.e(TAG, "Error reading preferences from DataStore", e)
-                        // Flow already emits default preferences on error via PreferencesRepository
-                        // Mark loading as complete even on error to unblock UI
                         _uiState.update { it.copy(isLoading = false) }
                     }
                     .collectLatest { prefs ->
@@ -53,7 +50,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Fatal error in preferences collection", e)
-                // Update state with defaults and mark as not loading to keep UI responsive
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
@@ -91,7 +87,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Refresh permissions asynchronously
         Log.d(TAG, "Initiating initial permission refresh")
         refreshPermissions()
     }
@@ -125,7 +120,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "UI state updated with permission status")
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing permissions", e)
-                // Update with error diagnostic but keep UI responsive
                 _uiState.update {
                     it.copy(permissionDiagnostic = "Error checking permissions: ${e.message}")
                 }
@@ -147,7 +141,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "YouTube setting saved successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting YouTube enabled to $enabled", e)
-                // Don't crash - just log the error
             }
         }
     }
@@ -160,7 +153,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "YouTube Music setting saved successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting YouTube Music enabled to $enabled", e)
-                // Don't crash - just log the error
             }
         }
     }
@@ -173,7 +165,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "Start on boot setting saved successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error setting start on boot to $enabled", e)
-                // Don't crash - just log the error
             }
         }
     }

@@ -98,6 +98,5 @@ fun audioFocusColorScheme(context: Context): ColorScheme {
     val baseScheme = if (isLightMode) ChromeLightColorScheme else ChromeDarkColorScheme
     val scheme = dynamicScheme ?: baseScheme
     
-    // Keep scrim from the base scheme to ensure consistent overlay dimming
     return scheme.copy(scrim = baseScheme.scrim)
 }

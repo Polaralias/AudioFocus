@@ -78,7 +78,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
             val snapshot = try {
                 val packageName = root.packageName?.toString()
 
-                // Strict enforcement: Only YouTube and YouTube Music are supported
                 val app = packageName.toSupportedApp()
                 if (app == null) {
                     Log.v(TAG, "Ignoring unsupported app: $packageName")
@@ -132,7 +131,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
 
                 val bounds = Rect().also(windowInfo::getBoundsInScreen)
                 val coverage = calculateCoverage(bounds, screenArea)
-                // Guard TYPE_PICTURE_IN_PICTURE usage (API 26+) to ensure compilation compatibility
                 val isPipWindow = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
                         windowInfo.type == TYPE_PICTURE_IN_PICTURE) ||
                     (coverage != null && coverage < PIP_COVERAGE_THRESHOLD)
@@ -174,7 +172,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
     }
 
     private fun isPictureInPicture(event: AccessibilityEvent, bounds: Rect): Boolean {
-        // Check PiP flag from event
         if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED &&
             event.windowChanges and AccessibilityEvent.WINDOWS_CHANGE_PIP != 0
         ) {
@@ -182,7 +179,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
             return true
         }
 
-        // Fallback: Check window coverage
         val metrics = resources.displayMetrics
         val screenArea = (metrics.widthPixels * metrics.heightPixels).takeIf { it > 0 } ?: run {
             Log.w(TAG, "Invalid screen dimensions")
@@ -206,7 +202,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
         val screenWidth = metrics.widthPixels
         val screenHeight = metrics.heightPixels
         
-        // Edge case: Invalid screen dimensions
         if (screenWidth <= 0 || screenHeight <= 0) {
             Log.w(TAG, "Invalid screen dimensions: ${screenWidth}x${screenHeight}")
             return WindowState.UNKNOWN
@@ -216,13 +211,11 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
         val heightRatio = bounds.height().coerceAtLeast(0).toFloat() / screenHeight.toFloat()
         val coverage = widthRatio * heightRatio
 
-        // Edge case: Window too small (likely background/hidden)
         if (coverage <= BACKGROUND_COVERAGE_THRESHOLD) {
             Log.d(TAG, "Window coverage indicates background: $coverage, state=BACKGROUND")
             return WindowState.BACKGROUND
         }
 
-        // Determine fullscreen vs minimized
         val state = if (coverage >= FULLSCREEN_COVERAGE_THRESHOLD) {
             WindowState.FULLSCREEN
         } else {
@@ -240,8 +233,6 @@ open class AudioFocusAccessibilityService : AccessibilityService() {
         private const val PIP_COVERAGE_THRESHOLD = 0.12f
         private const val BACKGROUND_COVERAGE_THRESHOLD = 0.01f
         
-        // TYPE_PICTURE_IN_PICTURE constant value from AccessibilityWindowInfo (API 26+)
-        // Defined locally as it may not be available in SDK stubs
         private const val TYPE_PICTURE_IN_PICTURE = 4
     }
 }

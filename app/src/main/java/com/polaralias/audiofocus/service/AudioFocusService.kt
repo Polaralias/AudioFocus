@@ -23,7 +23,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
     private var overlayView: OverlayView? = null
     private var windowManager: WindowManager? = null
 
-    // Use WindowHeuristics for reliable detection
     private val heuristics by lazy { WindowHeuristics(this) }
 
     private val pollingRunnable = object : Runnable {
@@ -45,7 +44,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
             mediaSessionManager.addOnActiveSessionsChangedListener(this, null, mainHandler)
             onActiveSessionsChanged(mediaSessionManager.getActiveSessions(null))
         } catch (e: SecurityException) {
-            // Handle permission issues or service not ready
         }
     }
 
@@ -58,7 +56,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
         try {
             mediaSessionManager.removeOnActiveSessionsChangedListener(this)
         } catch (e: Exception) {
-            // Ignore
         }
         controllerManager.setActiveController(null)
         mainHandler.removeCallbacks(pollingRunnable)
@@ -89,7 +86,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
             return
         }
 
-        // Use WindowHeuristics to evaluate the state
         val info = try {
             heuristics.evaluate(windows, resources.displayMetrics)
         } catch (e: Exception) {
@@ -104,40 +100,28 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
     }
 
     private fun shouldShowOverlay(info: WindowInfo): Boolean {
-        // Check if we have a focused supported package or any visible supported window
         val focusedPackage = info.focusedPackage
 
-        // If we have a focused package that is supported
         if (focusedPackage != null && isSupported(focusedPackage)) {
             val appInfo = info.appWindows[focusedPackage] ?: return false
 
-            // Logic: Video on screen -> Overlay.
-            // Video means: Shorts, Fullscreen, PiP, Standard Player, Video Mode in YTM.
-
-            // If PlayMode is VIDEO or SHORTS, show it.
             if (appInfo.playMode == PlayMode.VIDEO || appInfo.playMode == PlayMode.SHORTS) {
                 return true
             }
 
-            // Special case for YTM: If playMode is AUDIO, definitely hide.
             if (appInfo.playMode == PlayMode.AUDIO) {
                 return false
             }
 
-            // If we detected a video surface fraction > 0, it's likely a video.
             if (appInfo.hasVisibleVideoSurface) {
                 return true
             }
 
-            // If state is PiP, we usually want overlay if it's video
             if (appInfo.state == WindowState.PICTURE_IN_PICTURE) {
-                 // PiP implies video usually, but let's stick to playMode/surface check if possible.
-                 // However, WindowHeuristics sets PlayMode.VIDEO for PiP in inferPackageForPiP.
                  return true
             }
         }
 
-        // Fallback: Check any visible window (e.g. PiP might not be focused)
         info.appWindows.values.forEach { appInfo ->
             if (isSupported(appInfo.packageName) && appInfo.isVisible) {
                 if (appInfo.state == WindowState.PICTURE_IN_PICTURE) {
@@ -168,7 +152,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
             try {
                 windowManager?.addView(view, overlayView?.layoutParams)
             } catch (e: Exception) {
-                // Handle errors (e.g. permission denied)
             }
         }
     }
@@ -180,7 +163,6 @@ class AudioFocusService : AccessibilityService(), MediaSessionManager.OnActiveSe
                 windowManager?.removeView(view)
                 overlayView?.stopHeartbeat()
             } catch (e: Exception) {
-                // Handle errors
             }
         }
     }

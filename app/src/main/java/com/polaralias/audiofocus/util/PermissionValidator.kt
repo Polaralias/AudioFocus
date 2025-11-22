@@ -11,16 +11,9 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.polaralias.audiofocus.service.AccessWindowsService
 
-/**
- * Centralized utility for validating app permissions.
- * Provides strict sequential permission checks with comprehensive logging.
- */
 object PermissionValidator {
     private const val TAG = "PermissionValidator"
 
-    /**
-     * Permission check result with detailed diagnostic information
-     */
     data class PermissionStatus(
         val hasOverlayPermission: Boolean,
         val hasNotificationAccess: Boolean,
@@ -52,9 +45,6 @@ object PermissionValidator {
         }
     }
 
-    /**
-     * Check all required permissions with logging
-     */
     fun checkPermissions(context: Context, logTag: String = TAG): PermissionStatus {
         Log.i(logTag, "Starting permission validation")
         
@@ -64,7 +54,6 @@ object PermissionValidator {
         var hasAccessibility = false
         
         try {
-            // Check overlay permission
             Log.d(logTag, "Checking overlay permission...")
             hasOverlay = Settings.canDrawOverlays(context)
             Log.i(logTag, "Overlay permission check result: $hasOverlay")
@@ -73,7 +62,6 @@ object PermissionValidator {
         }
         
         try {
-            // Check notification access
             Log.d(logTag, "Checking notification access...")
             hasNotification = NotificationManagerCompat
                 .getEnabledListenerPackages(context)
@@ -108,7 +96,6 @@ object PermissionValidator {
         }
 
         try {
-            // Check accessibility access
             Log.d(logTag, "Checking accessibility access...")
             hasAccessibility = isAccessibilityEnabled(context)
             Log.i(logTag, "Accessibility access check result: $hasAccessibility")
@@ -122,10 +109,6 @@ object PermissionValidator {
         return status
     }
 
-    /**
-     * Validate permissions and log errors if any are missing
-     * @return true if all permissions are granted, false otherwise
-     */
     fun validateAllPermissions(context: Context, logTag: String = TAG): Boolean {
         val status = checkPermissions(context, logTag)
         if (!status.allPermissionsGranted) {
@@ -134,9 +117,6 @@ object PermissionValidator {
         return status.allPermissionsGranted
     }
 
-    /**
-     * Check if accessibility service is enabled
-     */
     private fun isAccessibilityEnabled(context: Context): Boolean {
         return try {
             Log.d(TAG, "Reading accessibility enabled services from system settings")

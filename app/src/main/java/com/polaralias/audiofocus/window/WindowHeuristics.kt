@@ -247,7 +247,6 @@ class WindowHeuristics(
         window: AccessibilityWindowInfo,
         coverage: Float,
     ): WindowState {
-        // TYPE_PINNED (value 4) was added in API 26 for Picture-in-Picture windows
         if (window.type == 4) {
             return WindowState.PICTURE_IN_PICTURE
         }

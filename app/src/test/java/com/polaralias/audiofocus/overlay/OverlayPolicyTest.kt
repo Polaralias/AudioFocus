@@ -5,8 +5,6 @@ import org.junit.Test
 
 class OverlayPolicyTest {
 
-    // YouTube Policy Tests
-
     @Test
     fun `youtube fullscreen with visible video shows full overlay`() {
         val state = ContextState(
@@ -105,7 +103,6 @@ class OverlayPolicyTest {
         assertEquals(OverlayBehaviour.NONE, OverlayPolicy.decideOverlay(state))
     }
 
-    // YouTube Music Policy Tests
 
     @Test
     fun `youtube music fullscreen video shows full overlay`() {
@@ -211,7 +208,6 @@ class OverlayPolicyTest {
         }
     }
 
-    // Other App Tests
 
     @Test
     fun `other apps never show overlay`() {
@@ -231,18 +227,13 @@ class OverlayPolicyTest {
         }
     }
 
-    // Policy Matrix Validation Test
-    // This test explicitly validates the entire policy matrix from the requirements
-
     @Test
     fun `policy matrix validation for youtube`() {
         val testCases = listOf(
-            // YouTube: Fullscreen, minimised in-app, or PiP | Visible video playback | Full-screen overlay
             Triple(WindowState.FULLSCREEN, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
             Triple(WindowState.PIP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
 
-            // YouTube: Any | Paused, stopped | No overlay
             Triple(WindowState.FULLSCREEN, Playback.PAUSED, OverlayBehaviour.NONE),
             Triple(WindowState.FULLSCREEN, Playback.STOPPED, OverlayBehaviour.NONE),
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PAUSED, OverlayBehaviour.NONE),
@@ -254,7 +245,6 @@ class OverlayPolicyTest {
             Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.PAUSED, OverlayBehaviour.NONE),
             Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.STOPPED, OverlayBehaviour.NONE),
 
-            // YouTube: Background | non-visible video playback (background playback) | No overlay
             Triple(WindowState.BACKGROUND, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
             Triple(WindowState.FULLSCREEN, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
@@ -275,21 +265,17 @@ class OverlayPolicyTest {
     @Test
     fun `policy matrix validation for youtube music`() {
         val testCases = listOf(
-            // YouTube Music: Fullscreen video | Video playback | Full-screen overlay
             Triple(WindowState.FULLSCREEN, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
 
-            // YouTube Music: Miniplayer or non-fullscreen video | Video playback | Full-screen overlay
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
             Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
             Triple(WindowState.PIP, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.FULL_SCREEN_OVERLAY),
 
-            // YouTube Music: Background | Background playback | No overlay
             Triple(WindowState.BACKGROUND, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
             Triple(WindowState.BACKGROUND, Playback.PLAYING_VIDEO_VISIBLE, OverlayBehaviour.NONE),
             Triple(WindowState.BACKGROUND, Playback.PAUSED, OverlayBehaviour.NONE),
             Triple(WindowState.BACKGROUND, Playback.STOPPED, OverlayBehaviour.NONE),
 
-            // YouTube Music: Any | Paused, stopped | No overlay
             Triple(WindowState.FULLSCREEN, Playback.PAUSED, OverlayBehaviour.NONE),
             Triple(WindowState.FULLSCREEN, Playback.STOPPED, OverlayBehaviour.NONE),
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PAUSED, OverlayBehaviour.NONE),
@@ -299,7 +285,6 @@ class OverlayPolicyTest {
             Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.PAUSED, OverlayBehaviour.NONE),
             Triple(WindowState.NON_FULLSCREEN_VIDEO, Playback.STOPPED, OverlayBehaviour.NONE),
 
-            // YouTube Music: Any state with background playback | No overlay
             Triple(WindowState.FULLSCREEN, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
             Triple(WindowState.MINIMIZED_IN_APP, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
             Triple(WindowState.PIP, Playback.PLAYING_BACKGROUND, OverlayBehaviour.NONE),
