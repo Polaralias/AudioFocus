@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AudioFocus</string>
+    <string name="accessibility_service_description">AudioFocus needs accessibility access to detect when video content is playing in supported apps.</string>
 </resources>
