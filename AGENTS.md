@@ -20,8 +20,8 @@
 - [x] Integration
 
 ## Phase 4: Logic Engine
-- [ ] Playback State Engine
-- [ ] Decision Logic
+- [x] Playback State Engine
+- [x] Decision Logic
 
 ## Phase 5: Overlay UI
 - [ ] System Alert Window
