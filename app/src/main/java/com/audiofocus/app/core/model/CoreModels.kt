@@ -42,3 +42,11 @@ data class OverlayDecision(
     val overlayMode: OverlayMode,
     val targetApp: TargetApp?
 )
+
+sealed class MediaAction {
+    data object Play : MediaAction()
+    data object Pause : MediaAction()
+    data object SkipForward : MediaAction()
+    data object SkipBackward : MediaAction()
+    data class Seek(val position: Long) : MediaAction()
+}
