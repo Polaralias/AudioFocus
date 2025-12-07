@@ -18,9 +18,12 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.audiofocus.app.core.logic.MediaControlClient
 import com.audiofocus.app.core.model.TargetApp
+import com.audiofocus.app.domain.settings.SettingsRepository
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import com.audiofocus.app.ui.overlay.OverlayScreen
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,14 +31,17 @@ import javax.inject.Singleton
 class OverlayManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val mediaControlClient: MediaControlClient,
-    private val mediaSessionMonitor: MediaSessionMonitor
+    private val mediaSessionMonitor: MediaSessionMonitor,
+    private val settingsRepository: SettingsRepository
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: ComposeView? = null
     private var lifecycleOwner: OverlayLifecycleOwner? = null
+    private val _targetApp = MutableStateFlow<TargetApp?>(null)
 
     fun show(targetApp: TargetApp) {
-        if (overlayView != null) return // Already showing
+        _targetApp.value = targetApp
+        if (overlayView != null) return // Already showing, flow updated
 
         lifecycleOwner = OverlayLifecycleOwner()
         lifecycleOwner?.performRestore(null)
@@ -48,9 +54,10 @@ class OverlayManager @Inject constructor(
 
             setContent {
                 OverlayScreen(
-                    targetApp = targetApp,
+                    targetAppFlow = _targetApp.asStateFlow(),
                     mediaControlClient = mediaControlClient,
-                    mediaSessionMonitor = mediaSessionMonitor
+                    mediaSessionMonitor = mediaSessionMonitor,
+                    settingsFlow = settingsRepository.overlaySettings
                 )
             }
         }
@@ -93,6 +100,7 @@ class OverlayManager @Inject constructor(
 
         overlayView = null
         lifecycleOwner = null
+        _targetApp.value = null
     }
 
     private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {

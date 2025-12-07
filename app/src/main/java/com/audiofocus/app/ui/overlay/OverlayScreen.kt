@@ -40,35 +40,79 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.audiofocus.app.core.logic.MediaControlClient
 import com.audiofocus.app.core.model.MediaAction
+import android.os.Build
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import com.audiofocus.app.core.model.OverlaySettings
 import com.audiofocus.app.core.model.TargetApp
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun OverlayScreen(
-    targetApp: TargetApp,
+    targetAppFlow: StateFlow<TargetApp?>,
     mediaControlClient: MediaControlClient,
-    mediaSessionMonitor: MediaSessionMonitor
+    mediaSessionMonitor: MediaSessionMonitor,
+    settingsFlow: Flow<OverlaySettings>
 ) {
+    val targetApp by targetAppFlow.collectAsState()
+    val settings by settingsFlow.collectAsState(initial = OverlaySettings())
     val controllers by mediaSessionMonitor.controllers.collectAsState(initial = emptyList())
-    val controller = controllers.find { it.packageName == targetApp.packageName }
+    val controller = targetApp?.let { app ->
+        controllers.find { it.packageName == app.packageName }
+    }
+
+    val metadata = controller?.metadata
+    val artBitmap = remember(metadata) {
+        metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black) // Fixed opacity 100% black
+            .background(Color(settings.backgroundColor))
     ) {
-        if (controller != null) {
-            MediaControls(
-                controller = controller,
-                onAction = { action -> mediaControlClient.sendAction(targetApp, action) }
+        if (artBitmap != null) {
+            val blurModifier = if (settings.isBlurEnabled && Build.VERSION.SDK_INT >= 31) {
+                Modifier.blur(20.dp)
+            } else {
+                Modifier
+            }
+
+            Image(
+                bitmap = artBitmap.asImageBitmap(),
+                contentDescription = "Album Art",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(blurModifier)
             )
-        } else {
-            Text(
-                text = "Connecting to ${targetApp.name}...",
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center)
+            // Scrim to ensure text legibility
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
             )
+        }
+
+        if (targetApp != null) {
+            if (controller != null) {
+                MediaControls(
+                    controller = controller,
+                    onAction = { action -> mediaControlClient.sendAction(targetApp!!, action) }
+                )
+            } else {
+                Text(
+                    text = "Connecting to ${targetApp!!.name}...",
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
         }
     }
 }
