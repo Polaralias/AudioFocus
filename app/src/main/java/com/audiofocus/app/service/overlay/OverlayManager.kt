@@ -106,11 +106,11 @@ class OverlayManager @Inject constructor(
     private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
         private val savedStateRegistryController = SavedStateRegistryController.create(this)
-        private val viewModelStore = ViewModelStore()
+        private val _viewModelStore = ViewModelStore()
 
         override val lifecycle: Lifecycle get() = lifecycleRegistry
         override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
-        override val viewModelStore: ViewModelStore get() = viewModelStore
+        override val viewModelStore: ViewModelStore get() = _viewModelStore
 
         fun handleLifecycleEvent(event: Lifecycle.Event) {
             lifecycleRegistry.handleLifecycleEvent(event)
