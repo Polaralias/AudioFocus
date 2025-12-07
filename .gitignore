@@ -20,3 +20,5 @@ local.properties
 
 # Google Services
 google-services.json
+.android_sdk/
+app/build/
