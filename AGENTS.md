@@ -11,6 +11,33 @@
 - [x] Manifest Configuration
 - [x] Permission Management
 
+## Phase 3: Monitors
+- [x] Monitor Architecture
+- [x] Accessibility Monitor
+- [x] Media Session Monitor
+- [x] Notification Monitor
+- [x] Foreground App Detector
+- [x] Integration
+
+## Phase 4: Logic Engine
+- [ ] Playback State Engine
+- [ ] Decision Logic
+
+## Phase 5: Overlay UI
+- [ ] System Alert Window
+- [ ] Media Controls
+- [ ] Customization
+
+## Phase 6: App UI & Settings
+- [ ] Onboarding Flow
+- [ ] Settings Screen
+- [ ] Persistence
+
+## Phase 7: QA & Polish
+- [ ] Verification
+- [ ] Performance Optimization
+- [ ] Edge Cases
+
 # Agents skill triage
 
 Agents using this repository should consult the skill documents stored locally in `./skills/<skill-id>/SKILL.md`.
