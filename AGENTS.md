@@ -1,3 +1,16 @@
+# Project Status
+
+## Phase 1: Project Setup & Infrastructure
+- [x] Project Initialization
+- [x] Dependencies
+- [x] Project Structure
+- [x] Core Data Models
+
+## Phase 2: Service & Permissions
+- [x] Service Implementation (Foreground, Accessibility, Notification)
+- [x] Manifest Configuration
+- [x] Permission Management
+
 # Agents skill triage
 
 Agents using this repository should consult the skill documents stored locally in `./skills/<skill-id>/SKILL.md`.
