@@ -55,3 +55,21 @@ data class OverlaySettings(
     val isBlurEnabled: Boolean = true,
     val backgroundColor: Long = 0xFF000000
 )
+
+enum class ThemeType {
+    SOLID,
+    IMAGE
+}
+
+data class ThemeConfig(
+    val type: ThemeType = ThemeType.SOLID,
+    val color: Int = 0xFF000000.toInt(),
+    val imageUri: String? = null,
+    val blurLevel: Int = 1 // 0-3
+)
+
+data class AppSettings(
+    val isMonitoringEnabled: Boolean = true,
+    val youtubeTheme: ThemeConfig = ThemeConfig(),
+    val youtubeMusicTheme: ThemeConfig = ThemeConfig()
+)

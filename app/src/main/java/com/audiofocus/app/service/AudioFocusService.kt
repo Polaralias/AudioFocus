@@ -16,6 +16,7 @@ import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import com.audiofocus.app.service.monitor.NotificationMonitor
+import com.audiofocus.app.domain.settings.SettingsRepository
 import com.audiofocus.app.service.overlay.OverlayManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -46,17 +47,38 @@ class AudioFocusService : Service() {
     @Inject
     lateinit var overlayManager: OverlayManager
 
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var isMonitoring = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startMonitoring()
+
+        // Observe settings to enable/disable monitoring
+        serviceScope.launch {
+            settingsRepository.appSettings.collect { settings ->
+                if (settings.isMonitoringEnabled) {
+                    if (!isMonitoring) {
+                        startMonitoring()
+                    }
+                } else {
+                    if (isMonitoring) {
+                        stopMonitoring(stopService = false)
+                    }
+                }
+            }
+        }
     }
 
     private fun startMonitoring() {
+        if (isMonitoring) return
+        isMonitoring = true
+
         mediaSessionMonitor.start()
 
         // Initial check for foreground app
@@ -107,7 +129,7 @@ class AudioFocusService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_MONITORING) {
-            stopMonitoring()
+            stopMonitoring(stopService = true)
             return START_NOT_STICKY
         }
 
@@ -138,17 +160,22 @@ class AudioFocusService : Service() {
             .build()
     }
 
-    private fun stopMonitoring() {
+    private fun stopMonitoring(stopService: Boolean) {
+        if (!isMonitoring && !stopService) return
+
+        isMonitoring = false
         mediaSessionMonitor.stop()
         overlayManager.hide()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        if (stopService) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
         }
-        stopSelf()
     }
 
     companion object {
