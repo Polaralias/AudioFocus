@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.audiofocus.app.core.Constants
+import com.audiofocus.app.core.logic.PlaybackStateEngine
 import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
@@ -37,6 +38,9 @@ class AudioFocusService : Service() {
 
     @Inject
     lateinit var foregroundAppDetector: ForegroundAppDetector
+
+    @Inject
+    lateinit var playbackStateEngine: PlaybackStateEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -73,6 +77,12 @@ class AudioFocusService : Service() {
         serviceScope.launch {
             foregroundAppDetector.foregroundPackage.collect { pkg ->
                 Log.d("AudioFocusService", "Foreground App: $pkg")
+            }
+        }
+
+        serviceScope.launch {
+            playbackStateEngine.overlayDecision.collect { decision ->
+                Log.d("AudioFocusService", "Overlay Decision: $decision")
             }
         }
     }

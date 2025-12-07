@@ -3,6 +3,7 @@ package com.audiofocus.app.core.logic
 import com.audiofocus.app.core.model.*
 import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.AccessibilityState
+import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import io.mockk.every
 import io.mockk.mockk
@@ -17,20 +18,24 @@ class PlaybackStateEngineTest {
 
     private lateinit var accessibilityMonitor: AccessibilityMonitor
     private lateinit var mediaSessionMonitor: MediaSessionMonitor
+    private lateinit var foregroundAppDetector: ForegroundAppDetector
     private lateinit var engine: PlaybackStateEngine
 
     private val accessibilityStates = MutableStateFlow<Map<TargetApp, AccessibilityState>>(emptyMap())
     private val mediaSessionStates = MutableStateFlow<Map<TargetApp, PlaybackStateSimplified>>(emptyMap())
+    private val foregroundPackage = MutableStateFlow<String?>(null)
 
     @Before
     fun setup() {
         accessibilityMonitor = mockk()
         mediaSessionMonitor = mockk()
+        foregroundAppDetector = mockk()
 
         every { accessibilityMonitor.states } returns accessibilityStates
         every { mediaSessionMonitor.observe() } returns mediaSessionStates
+        every { foregroundAppDetector.foregroundPackage } returns foregroundPackage
 
-        engine = PlaybackStateEngine(accessibilityMonitor, mediaSessionMonitor)
+        engine = PlaybackStateEngine(accessibilityMonitor, mediaSessionMonitor, foregroundAppDetector)
     }
 
     @Test
@@ -104,6 +109,22 @@ class PlaybackStateEngineTest {
             TargetApp.YOUTUBE_MUSIC to AccessibilityState(WindowState.FOREGROUND_FULLSCREEN, PlaybackType.NONE)
         )
         mediaSessionStates.value = mapOf(TargetApp.YOUTUBE_MUSIC to PlaybackStateSimplified.PLAYING)
+
+        // Act
+        val decision = engine.overlayDecision.first()
+
+        // Assert
+        assertEquals(false, decision.shouldOverlay)
+    }
+
+    @Test
+    fun `YouTube Fullscreen but another app in foreground should hide overlay`() = runTest {
+        // Arrange
+        accessibilityStates.value = mapOf(
+            TargetApp.YOUTUBE to AccessibilityState(WindowState.FOREGROUND_FULLSCREEN, PlaybackType.VISIBLE_VIDEO)
+        )
+        mediaSessionStates.value = mapOf(TargetApp.YOUTUBE to PlaybackStateSimplified.PLAYING)
+        foregroundPackage.value = "com.other.app"
 
         // Act
         val decision = engine.overlayDecision.first()
