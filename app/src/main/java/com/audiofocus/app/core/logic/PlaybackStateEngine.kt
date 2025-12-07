@@ -8,6 +8,7 @@ import com.audiofocus.app.core.model.TargetApp
 import com.audiofocus.app.core.model.WindowState
 import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.AccessibilityState
+import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -20,24 +21,27 @@ import javax.inject.Singleton
 @Singleton
 class PlaybackStateEngine @Inject constructor(
     accessibilityMonitor: AccessibilityMonitor,
-    mediaSessionMonitor: MediaSessionMonitor
+    mediaSessionMonitor: MediaSessionMonitor,
+    foregroundAppDetector: ForegroundAppDetector
 ) {
     @OptIn(FlowPreview::class)
     val overlayDecision: Flow<OverlayDecision> = combine(
         accessibilityMonitor.states,
-        mediaSessionMonitor.observe()
-    ) { accessibilityStates, mediaSessionStates ->
-        determineOverlayDecision(accessibilityStates, mediaSessionStates)
+        mediaSessionMonitor.observe(),
+        foregroundAppDetector.foregroundPackage
+    ) { accessibilityStates, mediaSessionStates, foregroundPackage ->
+        determineOverlayDecision(accessibilityStates, mediaSessionStates, foregroundPackage)
     }
     .debounce(200)
     .distinctUntilChanged()
 
     private fun determineOverlayDecision(
         accessibilityStates: Map<TargetApp, AccessibilityState>,
-        mediaSessionStates: Map<TargetApp, PlaybackStateSimplified>
+        mediaSessionStates: Map<TargetApp, PlaybackStateSimplified>,
+        foregroundPackage: String?
     ): OverlayDecision {
         for (app in TargetApp.entries) {
-            val decision = evaluateApp(app, accessibilityStates, mediaSessionStates)
+            val decision = evaluateApp(app, accessibilityStates, mediaSessionStates, foregroundPackage)
             if (decision.shouldOverlay) {
                 return decision
             }
@@ -48,13 +52,22 @@ class PlaybackStateEngine @Inject constructor(
     private fun evaluateApp(
         app: TargetApp,
         accessibilityStates: Map<TargetApp, AccessibilityState>,
-        mediaSessionStates: Map<TargetApp, PlaybackStateSimplified>
+        mediaSessionStates: Map<TargetApp, PlaybackStateSimplified>,
+        foregroundPackage: String?
     ): OverlayDecision {
         val accState = accessibilityStates[app]
         val playbackState = mediaSessionStates[app] ?: PlaybackStateSimplified.STOPPED
 
-        val windowState = accState?.windowState ?: WindowState.NOT_VISIBLE
+        var windowState = accState?.windowState ?: WindowState.NOT_VISIBLE
         val playbackType = accState?.playbackType ?: PlaybackType.NONE
+
+        // Utilization of foregroundPackage to verify the target app is actually the top package
+        if (foregroundPackage != null && foregroundPackage != app.packageName) {
+             if (windowState == WindowState.FOREGROUND_FULLSCREEN ||
+                 windowState == WindowState.FOREGROUND_MINIMISED) {
+                 windowState = WindowState.BACKGROUND
+             }
+        }
 
         return when (app) {
             TargetApp.YOUTUBE -> evaluateYouTube(windowState, playbackState, playbackType)
