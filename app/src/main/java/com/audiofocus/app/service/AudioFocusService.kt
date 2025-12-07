@@ -16,6 +16,7 @@ import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import com.audiofocus.app.service.monitor.NotificationMonitor
+import com.audiofocus.app.service.overlay.OverlayManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,9 @@ class AudioFocusService : Service() {
     @Inject
     lateinit var playbackStateEngine: PlaybackStateEngine
 
+    @Inject
+    lateinit var overlayManager: OverlayManager
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -53,6 +57,8 @@ class AudioFocusService : Service() {
     }
 
     private fun startMonitoring() {
+        mediaSessionMonitor.start()
+
         // Initial check for foreground app
         foregroundAppDetector.checkUsageStats()
 
@@ -83,6 +89,11 @@ class AudioFocusService : Service() {
         serviceScope.launch {
             playbackStateEngine.overlayDecision.collect { decision ->
                 Log.d("AudioFocusService", "Overlay Decision: $decision")
+                if (decision.shouldOverlay && decision.targetApp != null) {
+                    overlayManager.show(decision.targetApp)
+                } else {
+                    overlayManager.hide()
+                }
             }
         }
     }
@@ -90,6 +101,8 @@ class AudioFocusService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+        mediaSessionMonitor.stop()
+        overlayManager.hide()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -126,6 +139,9 @@ class AudioFocusService : Service() {
     }
 
     private fun stopMonitoring() {
+        mediaSessionMonitor.stop()
+        overlayManager.hide()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {

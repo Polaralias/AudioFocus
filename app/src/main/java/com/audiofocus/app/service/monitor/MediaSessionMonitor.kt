@@ -2,6 +2,7 @@ package com.audiofocus.app.service.monitor
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -11,9 +12,12 @@ import com.audiofocus.app.core.model.TargetApp
 import com.audiofocus.app.domain.PermissionManager
 import com.audiofocus.app.service.AppNotificationListenerService
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,75 +29,101 @@ class MediaSessionMonitor @Inject constructor(
     private val mediaSessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
     private val componentName = ComponentName(context, AppNotificationListenerService::class.java)
 
-    fun observe(): Flow<Map<TargetApp, PlaybackStateSimplified>> = callbackFlow {
+    private val _controllers = MutableSharedFlow<List<MediaController>>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val controllers: SharedFlow<List<MediaController>> = _controllers.asSharedFlow()
+
+    private val controllerCallbacks = mutableMapOf<MediaController, MediaController.Callback>()
+    private var isMonitoring = false
+
+    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+        updateControllers(controllers)
+    }
+
+    init {
+        // Ensure initial state
+        _controllers.tryEmit(emptyList())
+    }
+
+    fun start() {
+        if (isMonitoring) return
         if (!permissionManager.hasNotificationListenerPermission()) {
             Log.w("MediaSessionMonitor", "Notification listener permission missing")
-            trySend(emptyMap())
-            close()
-            return@callbackFlow
-        }
-
-        val controllerCallbacks = mutableMapOf<MediaController, MediaController.Callback>()
-
-        // Helper to update state based on current controllers
-        fun updateState(controllers: List<MediaController>?) {
-            val stateMap = mutableMapOf<TargetApp, PlaybackStateSimplified>()
-            controllers?.forEach { controller ->
-                val targetApp = TargetApp.entries.find { it.packageName == controller.packageName }
-                if (targetApp != null) {
-                    val playbackState = controller.playbackState
-                    stateMap[targetApp] = mapPlaybackState(playbackState)
-                }
-            }
-            trySend(stateMap)
-        }
-
-        val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            // Unregister old callbacks
-            controllerCallbacks.forEach { (controller, callback) ->
-                controller.unregisterCallback(callback)
-            }
-            controllerCallbacks.clear()
-
-            // Register new callbacks
-            controllers?.forEach { controller ->
-                val targetApp = TargetApp.entries.find { it.packageName == controller.packageName }
-                if (targetApp != null) {
-                    val callback = object : MediaController.Callback() {
-                        override fun onPlaybackStateChanged(state: PlaybackState?) {
-                            updateState(controllers)
-                        }
-                    }
-                    controller.registerCallback(callback)
-                    controllerCallbacks[controller] = callback
-                }
-            }
-            updateState(controllers)
+            return
         }
 
         try {
             mediaSessionManager.addOnActiveSessionsChangedListener(sessionsListener, componentName)
-            // Initial fetch
             val initialControllers = mediaSessionManager.getActiveSessions(componentName)
-            // Manually trigger listener logic to setup callbacks and initial state
-            sessionsListener.onActiveSessionsChanged(initialControllers)
+            updateControllers(initialControllers)
+            isMonitoring = true
         } catch (e: SecurityException) {
             Log.e("MediaSessionMonitor", "SecurityException: ${e.message}")
-            trySend(emptyMap())
-            close()
         }
+    }
 
-        awaitClose {
-            try {
-                mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener)
-            } catch (e: Exception) {
-                // Ignore
-            }
-            controllerCallbacks.forEach { (controller, callback) ->
-                controller.unregisterCallback(callback)
-            }
-            controllerCallbacks.clear()
+    fun stop() {
+        if (!isMonitoring) return
+        try {
+            mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener)
+        } catch (e: Exception) {
+            // Ignore
         }
+        cleanupCallbacks()
+        _controllers.tryEmit(emptyList())
+        isMonitoring = false
+    }
+
+    // Retain observe() for compatibility with PlaybackStateEngine and Service logs
+    fun observe(): Flow<Map<TargetApp, PlaybackStateSimplified>> {
+        return controllers.map { controllerList ->
+            val stateMap = mutableMapOf<TargetApp, PlaybackStateSimplified>()
+            controllerList.forEach { controller ->
+                val targetApp = TargetApp.entries.find { it.packageName == controller.packageName }
+                if (targetApp != null) {
+                    stateMap[targetApp] = mapPlaybackState(controller.playbackState)
+                }
+            }
+            stateMap
+        }
+    }
+
+    fun getController(targetApp: TargetApp): MediaController? {
+        // We can't synchronously get value from SharedFlow easily unless we use replayCache
+        return _controllers.replayCache.firstOrNull()?.find { it.packageName == targetApp.packageName }
+    }
+
+    private fun updateControllers(newControllers: List<MediaController>?) {
+        cleanupCallbacks()
+
+        val validControllers = newControllers ?: emptyList()
+
+        validControllers.forEach { controller ->
+            val targetApp = TargetApp.entries.find { it.packageName == controller.packageName }
+            if (targetApp != null) {
+                val callback = object : MediaController.Callback() {
+                    override fun onPlaybackStateChanged(state: PlaybackState?) {
+                        // Force update by emitting a new list copy
+                        _controllers.tryEmit(_controllers.replayCache.firstOrNull()?.toList() ?: emptyList())
+                    }
+                    override fun onMetadataChanged(metadata: MediaMetadata?) {
+                        _controllers.tryEmit(_controllers.replayCache.firstOrNull()?.toList() ?: emptyList())
+                    }
+                }
+                controller.registerCallback(callback)
+                controllerCallbacks[controller] = callback
+            }
+        }
+        _controllers.tryEmit(validControllers)
+    }
+
+    private fun cleanupCallbacks() {
+        controllerCallbacks.forEach { (controller, callback) ->
+            controller.unregisterCallback(callback)
+        }
+        controllerCallbacks.clear()
     }
 
     private fun mapPlaybackState(state: PlaybackState?): PlaybackStateSimplified {
