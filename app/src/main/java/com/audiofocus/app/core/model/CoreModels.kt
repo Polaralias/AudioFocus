@@ -50,3 +50,8 @@ sealed class MediaAction {
     data object SkipBackward : MediaAction()
     data class Seek(val position: Long) : MediaAction()
 }
+
+data class OverlaySettings(
+    val isBlurEnabled: Boolean = true,
+    val backgroundColor: Long = 0xFF000000
+)

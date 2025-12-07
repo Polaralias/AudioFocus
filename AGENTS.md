@@ -25,14 +25,14 @@
 - [x] Service Integration & Verification
 
 ## Phase 5: Overlay UI
-- [ ] System Alert Window
-- [ ] Media Controls
-- [ ] Customization
+- [x] System Alert Window
+- [x] Media Controls
+- [x] Customization
 
 ## Phase 6: App UI & Settings
 - [ ] Onboarding Flow
 - [ ] Settings Screen
-- [ ] Persistence
+- [x] Persistence
 
 ## Phase 7: QA & Polish
 - [ ] Verification
@@ -40,9 +40,11 @@
 - [ ] Edge Cases
 
 ## QA Evaluation (Current)
-- Validated Phases 1-3 implementation.
-- Fixed Phase 4 test failures and integrated Logic Engine into AudioFocusService.
-- Confirmed project is ready for Phase 5: Overlay UI.
+- Validated Phases 1-4 implementation.
+- Completed Phase 5 (Overlay UI) including System Alert Window, Media Controls, and Customization (Blur/Settings).
+- Started Phase 6 (Persistence/Settings Infrastructure) to support Overlay Customization.
+- Fixed logic gap in `OverlayManager` to handle target app switching dynamically.
+- Next Steps: Implement Phase 6 UI (Settings Screen, Onboarding) and Phase 7 verification.
 
 # Agents skill triage
 
