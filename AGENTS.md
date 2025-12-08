@@ -30,8 +30,8 @@
 - [x] Customization
 
 ## Phase 6: App UI & Settings
-- [ ] Onboarding Flow
-- [ ] Settings Screen
+- [x] Onboarding Flow
+- [x] Settings Screen
 - [x] Persistence
 
 ## Phase 7: QA & Polish
@@ -42,9 +42,8 @@
 ## QA Evaluation (Current)
 - Validated Phases 1-4 implementation.
 - Completed Phase 5 (Overlay UI) including System Alert Window, Media Controls, and Customization (Blur/Settings).
-- Started Phase 6 (Persistence/Settings Infrastructure) to support Overlay Customization.
-- Fixed logic gap in `OverlayManager` to handle target app switching dynamically.
-- Next Steps: Implement Phase 6 UI (Settings Screen, Onboarding) and Phase 7 verification.
+- Completed Phase 6 (App UI & Settings) including Onboarding and comprehensive Settings implementation with Image Picker and Theme Customization for both YouTube and YouTube Music.
+- Next Steps: Phase 7 QA verification.
 
 # Agents skill triage
 
