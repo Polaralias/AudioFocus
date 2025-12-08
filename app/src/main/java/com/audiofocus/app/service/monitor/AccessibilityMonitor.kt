@@ -28,6 +28,9 @@ class AccessibilityMonitor @Inject constructor(
     private val _states = MutableStateFlow<Map<TargetApp, AccessibilityState>>(emptyMap())
     val states: StateFlow<Map<TargetApp, AccessibilityState>> = _states.asStateFlow()
 
+    private val lastAnalysisTime = mutableMapOf<String, Long>()
+    private val THROTTLE_INTERVAL_MS = 500L
+
     private val displayMetrics = context.resources.displayMetrics
     private val screenHeight = displayMetrics.heightPixels
     private val screenWidth = displayMetrics.widthPixels
@@ -35,6 +38,15 @@ class AccessibilityMonitor @Inject constructor(
     fun onEvent(event: AccessibilityEvent, rootNode: AccessibilityNodeInfo?) {
         val packageName = event.packageName?.toString() ?: return
         val targetApp = TargetApp.entries.find { it.packageName == packageName } ?: return
+
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            val currentTime = System.currentTimeMillis()
+            val lastTime = lastAnalysisTime[packageName] ?: 0L
+            if (currentTime - lastTime < THROTTLE_INTERVAL_MS) {
+                return
+            }
+            lastAnalysisTime[packageName] = currentTime
+        }
 
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {

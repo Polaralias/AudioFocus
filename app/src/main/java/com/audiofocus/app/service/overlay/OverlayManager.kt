@@ -91,6 +91,7 @@ class OverlayManager @Inject constructor(
         lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        lifecycleOwner?.viewModelStore?.clear()
 
         try {
             windowManager.removeView(overlayView)
