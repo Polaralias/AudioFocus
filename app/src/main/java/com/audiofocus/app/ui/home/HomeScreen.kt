@@ -1,42 +1,44 @@
 package com.audiofocus.app.ui.home
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.audiofocus.app.core.model.AppSettings
+import com.audiofocus.app.core.model.TargetApp
+import com.audiofocus.app.core.model.ThemeConfig
+import com.audiofocus.app.core.model.ThemeType
 import com.audiofocus.app.domain.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,23 +55,36 @@ class HomeViewModel @Inject constructor(
             initialValue = AppSettings()
         )
 
+    private val _selectedApp = MutableStateFlow(TargetApp.YOUTUBE)
+    val selectedApp: StateFlow<TargetApp> = _selectedApp.asStateFlow()
+
+    fun selectApp(app: TargetApp) {
+        _selectedApp.value = app
+    }
+
     fun toggleMonitoring(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setMonitoringEnabled(enabled)
         }
     }
 
-    fun updateYoutubeThemeBlur(blurLevel: Int) {
+    fun updateTheme(config: ThemeConfig) {
         viewModelScope.launch {
-            val current = appSettings.value.youtubeTheme
-            settingsRepository.setYoutubeTheme(current.copy(blurLevel = blurLevel))
+            when (_selectedApp.value) {
+                TargetApp.YOUTUBE -> settingsRepository.setYoutubeTheme(config)
+                TargetApp.YOUTUBE_MUSIC -> settingsRepository.setYoutubeMusicTheme(config)
+            }
         }
     }
 
-    fun updateYoutubeThemeColor(color: Int) {
-        viewModelScope.launch {
-            val current = appSettings.value.youtubeTheme
-            settingsRepository.setYoutubeTheme(current.copy(color = color))
+    fun persistImagePermission(context: Context, uri: Uri) {
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
@@ -79,6 +94,14 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val settings by viewModel.appSettings.collectAsState()
+    val selectedApp by viewModel.selectedApp.collectAsState()
+    val context = LocalContext.current
+
+    // Determine current theme config based on selected app
+    val currentTheme = when (selectedApp) {
+        TargetApp.YOUTUBE -> settings.youtubeTheme
+        TargetApp.YOUTUBE_MUSIC -> settings.youtubeMusicTheme
+    }
 
     Scaffold(
         topBar = {
@@ -130,7 +153,70 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Blur Slider
+            // App Selector
+            TabRow(
+                selectedTabIndex = if (selectedApp == TargetApp.YOUTUBE) 0 else 1,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Tab(
+                    selected = selectedApp == TargetApp.YOUTUBE,
+                    onClick = { viewModel.selectApp(TargetApp.YOUTUBE) },
+                    text = { Text("YouTube") }
+                )
+                Tab(
+                    selected = selectedApp == TargetApp.YOUTUBE_MUSIC,
+                    onClick = { viewModel.selectApp(TargetApp.YOUTUBE_MUSIC) },
+                    text = { Text("YouTube Music") }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Theme Type Selector
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Theme Type",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = currentTheme.type == ThemeType.SOLID,
+                            onClick = { viewModel.updateTheme(currentTheme.copy(type = ThemeType.SOLID)) }
+                        )
+                        Text("Solid Color")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        RadioButton(
+                            selected = currentTheme.type == ThemeType.IMAGE,
+                            onClick = { viewModel.updateTheme(currentTheme.copy(type = ThemeType.IMAGE)) }
+                        )
+                        Text("Image")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Configuration based on type
+            if (currentTheme.type == ThemeType.SOLID) {
+                SolidColorConfig(
+                    currentColor = currentTheme.color,
+                    onColorSelected = { viewModel.updateTheme(currentTheme.copy(color = it)) }
+                )
+            } else {
+                ImageConfig(
+                    imageUri = currentTheme.imageUri,
+                    onImageSelected = { uri ->
+                        viewModel.persistImagePermission(context, uri)
+                        viewModel.updateTheme(currentTheme.copy(imageUri = uri.toString()))
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Blur Slider (Always available, but mainly for Image)
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -138,77 +224,176 @@ fun HomeScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Slider(
-                        value = settings.youtubeTheme.blurLevel.toFloat(),
-                        onValueChange = { viewModel.updateYoutubeThemeBlur(it.toInt()) },
+                        value = currentTheme.blurLevel.toFloat(),
+                        onValueChange = { viewModel.updateTheme(currentTheme.copy(blurLevel = it.toInt())) },
                         valueRange = 0f..3f,
-                        steps = 2 // 0, 1, 2, 3
+                        steps = 2
                     )
                     Text(
-                        text = "Level: ${settings.youtubeTheme.blurLevel}",
+                        text = "Level: ${currentTheme.blurLevel}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Background Color Preview (Simple implementation)
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Background Color",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row {
-                         // Simple color palette
-                         val colors = listOf(
-                             0xFF000000.toInt(), // Black
-                             0xFF1E1E1E.toInt(), // Dark Gray
-                             0xFF6200EE.toInt(), // Purple
-                             0xFF03DAC5.toInt()  // Teal
-                         )
-
-                         colors.forEach { color ->
-                             Box(
-                                 modifier = Modifier
-                                     .size(48.dp)
-                                     .padding(4.dp)
-                                     .clip(CircleShape)
-                                     .background(Color(color))
-                                     .clickable { viewModel.updateYoutubeThemeColor(color) }
-                             )
-                         }
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Preview Mock
+            // Preview
             Text(
                 text = "Preview",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(Color.Gray) // Placeholder for background image
+            PreviewCard(theme = currentTheme)
+            
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun SolidColorConfig(
+    currentColor: Int,
+    onColorSelected: (Int) -> Unit
+) {
+    var hexInput by remember(currentColor) {
+        mutableStateOf(String.format("#%06X", (0xFFFFFF and currentColor)))
+    }
+    
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Color Selection", style = MaterialTheme.typography.titleMedium)
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row {
+                val colors = listOf(
+                    0xFF000000.toInt(), // Black
+                    0xFF1E1E1E.toInt(), // Dark Gray
+                    0xFF6200EE.toInt(), // Purple
+                    0xFF03DAC5.toInt(), // Teal
+                    0xFFB00020.toInt()  // Red
+                )
+
+                colors.forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .padding(4.dp)
+                            .clip(CircleShape)
+                            .background(Color(color))
+                            .clickable { onColorSelected(color) }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = hexInput,
+                onValueChange = { input ->
+                    hexInput = input
+                    if (input.matches(Regex("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"))) {
+                        try {
+                            onColorSelected(android.graphics.Color.parseColor(input))
+                        } catch (e: Exception) {
+                            // Invalid color
+                        }
+                    }
+                },
+                label = { Text("Hex Color (#RRGGBB)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+            )
+        }
+    }
+}
+
+@Composable
+fun ImageConfig(
+    imageUri: String?,
+    onImageSelected: (Uri) -> Unit
+) {
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            onImageSelected(uri)
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Button(
+                onClick = {
+                    launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
             ) {
+                Text("Select Image from Gallery")
+            }
+            
+            if (imageUri != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Image Selected",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PreviewCard(theme: ThemeConfig) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (theme.type == ThemeType.IMAGE && theme.imageUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(Uri.parse(theme.imageUri))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Overlay Preview",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                // Apply blur overlay if needed (simple scrim for preview)
+                if (theme.blurLevel > 0) {
+                     Box(
+                         modifier = Modifier
+                             .fillMaxSize()
+                             .background(Color.Black.copy(alpha = theme.blurLevel * 0.2f))
+                     )
+                }
+            } else {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(settings.youtubeTheme.color).copy(alpha = 0.8f)) // Simple approximation
-                ) {
-                     Text(
-                         text = "Overlay Preview Area",
-                         color = Color.White,
-                         modifier = Modifier.align(Alignment.Center)
-                     )
-                }
+                        .background(Color(theme.color))
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)) // Simulate controls dimming
+            ) {
+                Text(
+                    text = "Overlay Controls Preview",
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
     }
