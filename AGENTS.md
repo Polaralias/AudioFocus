@@ -30,8 +30,8 @@
 - [x] Customization
 
 ## Phase 6: App UI & Settings
-- [ ] Onboarding Flow
-- [ ] Settings Screen
+- [x] Onboarding Flow
+- [x] Settings Screen
 - [x] Persistence
 
 ## Phase 7: QA & Polish
@@ -40,11 +40,14 @@
 - [ ] Edge Cases
 
 ## QA Evaluation (Current)
-- Validated Phases 1-4 implementation.
-- Completed Phase 5 (Overlay UI) including System Alert Window, Media Controls, and Customization (Blur/Settings).
-- Started Phase 6 (Persistence/Settings Infrastructure) to support Overlay Customization.
-- Fixed logic gap in `OverlayManager` to handle target app switching dynamically.
-- Next Steps: Implement Phase 6 UI (Settings Screen, Onboarding) and Phase 7 verification.
+- Validated Phases 1-5 implementation.
+- Completed Phase 6 (App UI & Settings):
+    - Implemented `OnboardingScreen` for permission management.
+    - Implemented `HomeScreen` for app selection and theme customization (Solid Color/Image, Blur).
+    - Integrated `SettingsRepository` with `OverlayManager` and `OverlayScreen`.
+    - Refactored `OverlayScreen` to support app-specific themes and custom images using Coil.
+- Addressed QA finding: Restored Album Art fallback logic in `OverlayScreen` to ensure users see media artwork when using Solid Color themes if no custom image is selected.
+- Next Steps: Proceed to Phase 7 (Verification & Polish) to verify full end-to-end flows on device and optimize performance.
 
 # Agents skill triage
 

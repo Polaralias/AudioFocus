@@ -3,7 +3,10 @@ package com.audiofocus.app.ui.overlay
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.PlaybackState
+import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,17 +39,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import com.audiofocus.app.core.logic.MediaControlClient
-import com.audiofocus.app.core.model.MediaAction
-import android.os.Build
-import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import com.audiofocus.app.core.model.OverlaySettings
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.audiofocus.app.core.logic.MediaControlClient
+import com.audiofocus.app.core.model.AppSettings
+import com.audiofocus.app.core.model.MediaAction
 import com.audiofocus.app.core.model.TargetApp
+import com.audiofocus.app.core.model.ThemeConfig
+import com.audiofocus.app.core.model.ThemeType
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -57,15 +63,23 @@ fun OverlayScreen(
     targetAppFlow: StateFlow<TargetApp?>,
     mediaControlClient: MediaControlClient,
     mediaSessionMonitor: MediaSessionMonitor,
-    settingsFlow: Flow<OverlaySettings>
+    appSettingsFlow: Flow<AppSettings>
 ) {
     val targetApp by targetAppFlow.collectAsState()
-    val settings by settingsFlow.collectAsState(initial = OverlaySettings())
+    val appSettings by appSettingsFlow.collectAsState(initial = AppSettings())
     val controllers by mediaSessionMonitor.controllers.collectAsState(initial = emptyList())
+
+    val targetTheme = when (targetApp) {
+        TargetApp.YOUTUBE -> appSettings.youtubeTheme
+        TargetApp.YOUTUBE_MUSIC -> appSettings.youtubeMusicTheme
+        else -> ThemeConfig() // Default fallback
+    }
+
     val controller = targetApp?.let { app ->
         controllers.find { it.packageName == app.packageName }
     }
 
+    // Restore Album Art extraction logic
     val metadata = controller?.metadata
     val artBitmap = remember(metadata) {
         metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
@@ -75,11 +89,46 @@ fun OverlayScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(settings.backgroundColor))
+            .background(Color(targetTheme.color))
     ) {
-        if (artBitmap != null) {
-            val blurModifier = if (settings.isBlurEnabled && Build.VERSION.SDK_INT >= 31) {
-                Modifier.blur(20.dp)
+        // 1. Custom Image (Highest Priority if type is IMAGE and URI exists)
+        if (targetTheme.type == ThemeType.IMAGE && targetTheme.imageUri != null) {
+            val blurModifier = if (targetTheme.blurLevel > 0 && Build.VERSION.SDK_INT >= 31) {
+                // Map blur level (0-3) to dp (0, 10, 20, 30)
+                Modifier.blur((targetTheme.blurLevel * 10).dp)
+            } else {
+                Modifier
+            }
+
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(Uri.parse(targetTheme.imageUri))
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Background",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(blurModifier)
+            )
+
+            if (targetTheme.blurLevel < 2) {
+                 Box(
+                     modifier = Modifier
+                         .fillMaxSize()
+                         .background(Color.Black.copy(alpha = 0.3f))
+                 )
+            }
+        }
+        // 2. Album Art Fallback (If in SOLID mode, OR IMAGE mode but no URI)
+        else if (artBitmap != null) {
+            // If user selected SOLID, they likely want the art to be the main focus or background.
+            // If they selected a specific blur level, we should apply it to the art too?
+            // Spec: "An optional blur setting... is available for images".
+            // Implementation decision: Apply the blur setting to the Album Art as well if it's acting as the background image.
+
+            val blurModifier = if (targetTheme.blurLevel > 0 && Build.VERSION.SDK_INT >= 31) {
+                Modifier.blur((targetTheme.blurLevel * 10).dp)
             } else {
                 Modifier
             }
@@ -92,7 +141,8 @@ fun OverlayScreen(
                     .fillMaxSize()
                     .then(blurModifier)
             )
-            // Scrim to ensure text legibility
+
+            // Standard scrim for legibility
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -242,8 +292,6 @@ private fun calculatePosition(state: PlaybackState?): Long {
     val current = state.position
     if (state.state == PlaybackState.STATE_PLAYING) {
         val timeDelta = SystemClock.elapsedRealtime() - state.lastPositionUpdateTime
-        // Ensure we don't return negative or overflow (though unlikely with long)
-        // Also respect speed
         val predicted = current + (timeDelta * state.playbackSpeed).toLong()
         return predicted.coerceAtLeast(0L)
     }
