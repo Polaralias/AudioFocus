@@ -12,7 +12,7 @@ class MediaControlClient @Inject constructor(
 ) {
     fun sendAction(targetApp: TargetApp, action: MediaAction) {
         val controller = mediaSessionMonitor.getController(targetApp) ?: return
-        val transportControls = controller.transportControls ?: return
+        val transportControls = controller.transportControls
 
         when (action) {
             is MediaAction.Play -> transportControls.play()

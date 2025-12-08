@@ -26,6 +26,7 @@ class AppAccessibilityService : AccessibilityService() {
             accessibilityMonitor.onEvent(event, rootNode)
             foregroundAppDetector.onAccessibilityEvent(event)
         } finally {
+            @Suppress("DEPRECATION")
             rootNode?.recycle()
         }
     }

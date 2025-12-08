@@ -67,6 +67,7 @@ class AccessibilityMonitor @Inject constructor(
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun analyzeWindow(root: AccessibilityNodeInfo): AccessibilityState {
         var hasVideoSurface = false
         val queue = ArrayDeque<AccessibilityNodeInfo>()

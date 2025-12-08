@@ -35,9 +35,10 @@
 - [x] Persistence
 
 ## Phase 7: QA & Polish
-- [ ] Verification
+- [x] Verification (Code & Lint)
 - [ ] Performance Optimization
 - [ ] Edge Cases
+- [x] CI/CD Pipeline
 
 ## QA Evaluation (Current)
 - Validated Phases 1-5 implementation.
@@ -46,8 +47,13 @@
     - Implemented `HomeScreen` for app selection and theme customization (Solid Color/Image, Blur).
     - Integrated `SettingsRepository` with `OverlayManager` and `OverlayScreen`.
     - Refactored `OverlayScreen` to support app-specific themes and custom images using Coil.
-- Addressed QA finding: Restored Album Art fallback logic in `OverlayScreen` to ensure users see media artwork when using Solid Color themes if no custom image is selected.
-- Next Steps: Proceed to Phase 7 (Verification & Polish) to verify full end-to-end flows on device and optimize performance.
+- Completed Final QA Review:
+    - Passed `./gradlew testDebugUnitTest` and `./gradlew lintDebug`.
+    - Fixed lint warnings regarding `QueryAllPackagesPermission` (suppressed), `MediaControlClient` redundancy, `PermissionManager` deprecation, and Accessibility recycling deprecation.
+    - Simplified `OverlayManager` window type logic for minSdk 26.
+- Established CI/CD:
+    - Created GitHub Action workflow `.github/workflows/android-debug.yml` for automatic debug APK builds, unit tests, and linting.
+- Next Steps: Proceed to Phase 7 (Performance Optimization & Edge Cases) to verify full end-to-end flows on device.
 
 # Agents skill triage
 
