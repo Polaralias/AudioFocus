@@ -57,7 +57,7 @@ class OverlayManager @Inject constructor(
                     targetAppFlow = _targetApp.asStateFlow(),
                     mediaControlClient = mediaControlClient,
                     mediaSessionMonitor = mediaSessionMonitor,
-                    settingsFlow = settingsRepository.overlaySettings
+                    appSettingsFlow = settingsRepository.appSettings
                 )
             }
         }
