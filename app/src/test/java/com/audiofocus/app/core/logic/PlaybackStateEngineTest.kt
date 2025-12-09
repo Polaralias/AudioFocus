@@ -71,7 +71,7 @@ class PlaybackStateEngineTest {
     }
 
     @Test
-    fun `YouTube Audio Only should hide overlay`() = runTest {
+    fun `YouTube Playing Fullscreen should show overlay even if Video Surface not detected`() = runTest {
         // Arrange
         accessibilityStates.value = mapOf(
             TargetApp.YOUTUBE to AccessibilityState(WindowState.FOREGROUND_FULLSCREEN, PlaybackType.NONE) // No video surface
@@ -82,7 +82,9 @@ class PlaybackStateEngineTest {
         val decision = engine.overlayDecision.first()
 
         // Assert
-        assertEquals(false, decision.shouldOverlay)
+        assertEquals(true, decision.shouldOverlay)
+        assertEquals(OverlayMode.FULL_SCREEN, decision.overlayMode)
+        assertEquals(TargetApp.YOUTUBE, decision.targetApp)
     }
 
     @Test
@@ -103,7 +105,7 @@ class PlaybackStateEngineTest {
     }
 
     @Test
-    fun `YouTube Music Audio Playing should hide overlay`() = runTest {
+    fun `YouTube Music Playing should show overlay if visible even if Video Surface not detected`() = runTest {
         // Arrange
         accessibilityStates.value = mapOf(
             TargetApp.YOUTUBE_MUSIC to AccessibilityState(WindowState.FOREGROUND_FULLSCREEN, PlaybackType.NONE)
@@ -114,7 +116,9 @@ class PlaybackStateEngineTest {
         val decision = engine.overlayDecision.first()
 
         // Assert
-        assertEquals(false, decision.shouldOverlay)
+        assertEquals(true, decision.shouldOverlay)
+        assertEquals(OverlayMode.FULL_SCREEN, decision.overlayMode)
+        assertEquals(TargetApp.YOUTUBE_MUSIC, decision.targetApp)
     }
 
     @Test

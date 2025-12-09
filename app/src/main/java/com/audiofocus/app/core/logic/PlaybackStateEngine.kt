@@ -59,7 +59,6 @@ class PlaybackStateEngine @Inject constructor(
         val playbackState = mediaSessionStates[app] ?: PlaybackStateSimplified.STOPPED
 
         var windowState = accState?.windowState ?: WindowState.NOT_VISIBLE
-        val playbackType = accState?.playbackType ?: PlaybackType.NONE
 
         // Utilization of foregroundPackage to verify the target app is actually the top package
         if (foregroundPackage != null && foregroundPackage != app.packageName) {
@@ -70,26 +69,23 @@ class PlaybackStateEngine @Inject constructor(
         }
 
         return when (app) {
-            TargetApp.YOUTUBE -> evaluateYouTube(windowState, playbackState, playbackType)
-            TargetApp.YOUTUBE_MUSIC -> evaluateYouTubeMusic(windowState, playbackState, playbackType)
+            TargetApp.YOUTUBE -> evaluateYouTube(windowState, playbackState)
+            TargetApp.YOUTUBE_MUSIC -> evaluateYouTubeMusic(windowState, playbackState)
         }
     }
 
     private fun evaluateYouTube(
         windowState: WindowState,
-        playbackState: PlaybackStateSimplified,
-        playbackType: PlaybackType
+        playbackState: PlaybackStateSimplified
     ): OverlayDecision {
         if (playbackState == PlaybackStateSimplified.PAUSED || playbackState == PlaybackStateSimplified.STOPPED) {
             return noOverlay()
         }
 
-        if (playbackType == PlaybackType.VISIBLE_VIDEO) {
-             if (windowState == WindowState.FOREGROUND_FULLSCREEN ||
-                 windowState == WindowState.FOREGROUND_MINIMISED ||
-                 windowState == WindowState.PICTURE_IN_PICTURE) {
-                 return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE)
-             }
+        if (windowState == WindowState.FOREGROUND_FULLSCREEN ||
+             windowState == WindowState.FOREGROUND_MINIMISED ||
+             windowState == WindowState.PICTURE_IN_PICTURE) {
+             return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE)
         }
 
         return noOverlay()
@@ -97,17 +93,14 @@ class PlaybackStateEngine @Inject constructor(
 
     private fun evaluateYouTubeMusic(
         windowState: WindowState,
-        playbackState: PlaybackStateSimplified,
-        playbackType: PlaybackType
+        playbackState: PlaybackStateSimplified
     ): OverlayDecision {
         if (playbackState != PlaybackStateSimplified.PLAYING) {
              return noOverlay()
         }
 
-        if (playbackType == PlaybackType.VISIBLE_VIDEO) {
-             if (windowState != WindowState.NOT_VISIBLE && windowState != WindowState.BACKGROUND) {
-                 return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE_MUSIC)
-             }
+        if (windowState != WindowState.NOT_VISIBLE && windowState != WindowState.BACKGROUND) {
+             return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE_MUSIC)
         }
 
         return noOverlay()
