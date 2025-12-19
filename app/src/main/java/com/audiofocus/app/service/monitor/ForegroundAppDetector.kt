@@ -21,9 +21,7 @@ class ForegroundAppDetector @Inject constructor(
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             event.packageName?.toString()?.let { packageName ->
-                if (packageName != context.packageName) {
-                    _foregroundPackage.value = packageName
-                }
+                _foregroundPackage.value = packageName
             }
         }
     }
@@ -40,9 +38,7 @@ class ForegroundAppDetector @Inject constructor(
             )
             val recent = stats?.maxByOrNull { it.lastTimeUsed }
             recent?.packageName?.let { packageName ->
-                if (packageName != context.packageName) {
-                    _foregroundPackage.value = packageName
-                }
+                _foregroundPackage.value = packageName
             }
         }
     }

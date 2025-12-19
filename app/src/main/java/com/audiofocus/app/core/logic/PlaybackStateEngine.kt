@@ -10,6 +10,7 @@ import com.audiofocus.app.service.monitor.AccessibilityMonitor
 import com.audiofocus.app.service.monitor.AccessibilityState
 import com.audiofocus.app.service.monitor.ForegroundAppDetector
 import com.audiofocus.app.service.monitor.MediaSessionMonitor
+import android.util.Log
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -65,6 +66,7 @@ class PlaybackStateEngine @Inject constructor(
         if (foregroundPackage != null && foregroundPackage != app.packageName) {
              if (windowState == WindowState.FOREGROUND_FULLSCREEN ||
                  windowState == WindowState.FOREGROUND_MINIMISED) {
+                 Log.d("PlaybackStateEngine", "Demoting ${app.name} to BACKGROUND because foreground is $foregroundPackage")
                  windowState = WindowState.BACKGROUND
              }
         }
@@ -81,6 +83,7 @@ class PlaybackStateEngine @Inject constructor(
         playbackType: PlaybackType
     ): OverlayDecision {
         if (playbackState == PlaybackStateSimplified.PAUSED || playbackState == PlaybackStateSimplified.STOPPED) {
+            Log.d("PlaybackStateEngine", "YouTube: No overlay (PlaybackState: $playbackState)")
             return noOverlay()
         }
 
@@ -88,8 +91,13 @@ class PlaybackStateEngine @Inject constructor(
              if (windowState == WindowState.FOREGROUND_FULLSCREEN ||
                  windowState == WindowState.FOREGROUND_MINIMISED ||
                  windowState == WindowState.PICTURE_IN_PICTURE) {
+                 Log.d("PlaybackStateEngine", "YouTube: Show Overlay (FULL_SCREEN)")
                  return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE)
+             } else {
+                 Log.d("PlaybackStateEngine", "YouTube: No overlay (WindowState: $windowState)")
              }
+        } else {
+            Log.d("PlaybackStateEngine", "YouTube: No overlay (PlaybackType: $playbackType)")
         }
 
         return noOverlay()
@@ -101,13 +109,19 @@ class PlaybackStateEngine @Inject constructor(
         playbackType: PlaybackType
     ): OverlayDecision {
         if (playbackState != PlaybackStateSimplified.PLAYING) {
+             Log.d("PlaybackStateEngine", "YouTube Music: No overlay (PlaybackState: $playbackState)")
              return noOverlay()
         }
 
         if (playbackType == PlaybackType.VISIBLE_VIDEO) {
              if (windowState != WindowState.NOT_VISIBLE && windowState != WindowState.BACKGROUND) {
+                 Log.d("PlaybackStateEngine", "YouTube Music: Show Overlay (FULL_SCREEN)")
                  return OverlayDecision(true, OverlayMode.FULL_SCREEN, TargetApp.YOUTUBE_MUSIC)
+             } else {
+                 Log.d("PlaybackStateEngine", "YouTube Music: No overlay (WindowState: $windowState)")
              }
+        } else {
+            Log.d("PlaybackStateEngine", "YouTube Music: No overlay (PlaybackType: $playbackType)")
         }
 
         return noOverlay()
