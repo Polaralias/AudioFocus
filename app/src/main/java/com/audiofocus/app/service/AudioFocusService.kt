@@ -21,6 +21,7 @@ import com.audiofocus.app.service.overlay.OverlayManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -51,6 +52,7 @@ class AudioFocusService : Service() {
     lateinit var settingsRepository: SettingsRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var monitoringJob: Job? = null
     private var isMonitoring = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -78,37 +80,41 @@ class AudioFocusService : Service() {
     private fun startMonitoring() {
         if (isMonitoring) return
         isMonitoring = true
+        monitoringJob?.cancel()
+        monitoringJob = SupervisorJob(serviceScope.coroutineContext[Job])
 
         mediaSessionMonitor.start()
 
         // Initial check for foreground app
         foregroundAppDetector.checkUsageStats()
 
-        serviceScope.launch {
+        val scope = CoroutineScope(serviceScope.coroutineContext + monitoringJob!!)
+
+        scope.launch {
             mediaSessionMonitor.observe().collect { state ->
                 Log.d("AudioFocusService", "Media Session State: $state")
             }
         }
 
-        serviceScope.launch {
+        scope.launch {
             accessibilityMonitor.states.collect { state ->
                 Log.d("AudioFocusService", "Accessibility State: $state")
             }
         }
 
-        serviceScope.launch {
+        scope.launch {
             notificationMonitor.activeMediaNotifications.collect { state ->
                 Log.d("AudioFocusService", "Notification State: $state")
             }
         }
 
-        serviceScope.launch {
+        scope.launch {
             foregroundAppDetector.foregroundPackage.collect { pkg ->
                 Log.d("AudioFocusService", "Foreground App: $pkg")
             }
         }
 
-        serviceScope.launch {
+        scope.launch {
             playbackStateEngine.overlayDecision.collect { decision ->
                 Log.d("AudioFocusService", "Overlay Decision: $decision")
                 if (decision.shouldOverlay && decision.targetApp != null) {
@@ -164,6 +170,9 @@ class AudioFocusService : Service() {
         if (!isMonitoring && !stopService) return
 
         isMonitoring = false
+        monitoringJob?.cancel()
+        monitoringJob = null
+
         mediaSessionMonitor.stop()
         overlayManager.hide()
 
