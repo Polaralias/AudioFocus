@@ -82,8 +82,7 @@ class AccessibilityMonitor @Inject constructor(
             nodeCount++
 
             // Check for video surface
-            if (!hasVideoSurface) { // Only search if not found yet?
-                // Wait, multiple surfaces? We just need one visible.
+            if (!hasVideoSurface) {
                 if (node.className != null && (
                     node.className == "android.view.SurfaceView" ||
                     node.className == "android.view.TextureView" ||
@@ -96,8 +95,12 @@ class AccessibilityMonitor @Inject constructor(
                 }
             }
 
-            for (i in 0 until node.childCount) {
-                node.getChild(i)?.let { queue.add(it) }
+            // Optimization: Only traverse children if we haven't found a surface yet.
+            // If we found it, we just need to finish recycling the queue.
+            if (!hasVideoSurface) {
+                for (i in 0 until node.childCount) {
+                    node.getChild(i)?.let { queue.add(it) }
+                }
             }
 
             if (node != root) {
