@@ -75,7 +75,7 @@ class AccessibilityMonitor @Inject constructor(
 
         // Safety counter to prevent infinite loops or massive tree hangs
         var nodeCount = 0
-        val maxNodes = 500
+        val maxNodes = 2000
 
         while (queue.isNotEmpty() && nodeCount < maxNodes) {
             val node = queue.removeFirst()
