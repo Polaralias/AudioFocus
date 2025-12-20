@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.audiofocus.app"
+    namespace = "com.polaralias.audiofocus"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.audiofocus.app"
+        applicationId = "com.polaralias.audiofocus"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

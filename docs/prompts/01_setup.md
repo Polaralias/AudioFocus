@@ -29,7 +29,7 @@ Initialize the AudioFocus Android project, set up the build environment, and def
 
 3.  **Project Structure**
     *   Set up a modular or clean package structure:
-        *   `com.audiofocus.app`
+        *   `com.polaralias.audiofocus`
         *   `core`: Common models, utils.
         *   `data`: Repositories, data sources.
         *   `domain`: Use cases, business logic.
