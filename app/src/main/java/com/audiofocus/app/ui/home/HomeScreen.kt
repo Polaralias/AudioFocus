@@ -34,7 +34,9 @@ import com.audiofocus.app.core.model.TargetApp
 import com.audiofocus.app.core.model.ThemeConfig
 import com.audiofocus.app.core.model.ThemeType
 import com.audiofocus.app.domain.settings.SettingsRepository
+import com.audiofocus.app.service.AudioFocusService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +47,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val appSettings: StateFlow<AppSettings> = settingsRepository.appSettings
@@ -65,6 +68,20 @@ class HomeViewModel @Inject constructor(
     fun toggleMonitoring(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setMonitoringEnabled(enabled)
+
+            if (enabled) {
+                val intent = Intent(context, AudioFocusService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } else {
+                val intent = Intent(context, AudioFocusService::class.java).apply {
+                    action = AudioFocusService.ACTION_STOP_MONITORING
+                }
+                context.startService(intent)
+            }
         }
     }
 

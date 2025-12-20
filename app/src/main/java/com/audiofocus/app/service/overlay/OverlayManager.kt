@@ -3,6 +3,8 @@ package com.audiofocus.app.service.overlay
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -40,6 +42,11 @@ class OverlayManager @Inject constructor(
     private val _targetApp = MutableStateFlow<TargetApp?>(null)
 
     fun show(targetApp: TargetApp) {
+        if (!Settings.canDrawOverlays(context)) {
+            Log.e("OverlayManager", "Overlay permission not granted. Cannot show overlay.")
+            return
+        }
+
         _targetApp.value = targetApp
         if (overlayView != null) return // Already showing, flow updated
 
@@ -78,6 +85,7 @@ class OverlayManager @Inject constructor(
         try {
             windowManager.addView(overlayView, params)
         } catch (e: Exception) {
+            Log.e("OverlayManager", "Failed to add overlay view", e)
             e.printStackTrace()
         }
     }
